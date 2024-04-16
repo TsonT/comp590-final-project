@@ -37,22 +37,22 @@ const SideBar: FC = () => {
   return (
     <>
       <div
-        className={`border-dark-lighten h-screen flex-shrink-0 overflow-y-auto overflow-x-hidden border-r ${
+        className={`h-screen flex-shrink-0 overflow-y-auto overflow-x-hidden border-r border-dark-lighten ${
           location.pathname !== "/"
             ? "hidden w-[350px] md:!block"
             : "w-full md:!w-[350px]"
         }`}
       >
-        <div className="border-dark-lighten flex h-20 items-center justify-between border-b px-6">
+        <div className="flex h-20 items-center justify-between border-b border-dark-lighten px-6">
           <Link to="/" className="flex items-center gap-1">
             <img className="h-8 w-8" src="/icon.svg" alt="" />
-            <h1 className="text-xl">FireVerse</h1>
+            <h1 className="text-xl">TarChat</h1>
           </Link>
 
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCreateConversationOpened(true)}
-              className="bg-dark-lighten h-8 w-8 rounded-full"
+              className="h-8 w-8 rounded-full bg-dark-lighten"
             >
               <i className="bx bxs-edit text-xl"></i>
             </button>
@@ -72,7 +72,7 @@ const SideBar: FC = () => {
                   />
 
                   <div
-                    className={`border-dark-lighten bg-dark absolute top-full right-0 flex w-max origin-top-right flex-col items-stretch overflow-hidden rounded-md border py-1 shadow-lg transition-all duration-200 ${
+                    className={`absolute top-full right-0 flex w-max origin-top-right flex-col items-stretch overflow-hidden rounded-md border border-dark-lighten bg-dark py-1 shadow-lg transition-all duration-200 ${
                       isDropdownOpened
                         ? "visible scale-100 opacity-100"
                         : "invisible scale-0 opacity-0"
@@ -83,14 +83,14 @@ const SideBar: FC = () => {
                         setIsUserInfoOpened(true);
                         setIsDropdownOpened(false);
                       }}
-                      className="hover:bg-dark-lighten flex items-center gap-1 px-3 py-1 transition duration-300"
+                      className="flex items-center gap-1 px-3 py-1 transition duration-300 hover:bg-dark-lighten"
                     >
                       <i className="bx bxs-user text-xl"></i>
                       <span className="whitespace-nowrap">Profile</span>
                     </button>
                     <button
                       onClick={() => signOut(auth)}
-                      className="hover:bg-dark-lighten flex items-center gap-1 px-3 py-1 transition duration-300"
+                      className="flex items-center gap-1 px-3 py-1 transition duration-300 hover:bg-dark-lighten"
                     >
                       <i className="bx bx-log-out text-xl"></i>
                       <span className="whitespace-nowrap">Sign Out</span>
@@ -115,7 +115,7 @@ const SideBar: FC = () => {
             <p className="text-center">No conversation found</p>
             <button
               onClick={() => setCreateConversationOpened(true)}
-              className="text-primary text-center"
+              className="text-center text-primary"
             >
               Create one
             </button>

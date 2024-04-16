@@ -13,7 +13,7 @@ interface StickerPickerOpened {
 }
 
 const getRecentStickers = () => {
-  const existing = localStorage.getItem("fireverse-recent-stickers") || "[]";
+  const existing = localStorage.getItem("tarchat-recent-stickers") || "[]";
   try {
     const parsed = JSON.parse(existing);
     if (Array.isArray(parsed)) return parsed;
@@ -33,7 +33,7 @@ const StickerPicker: FC<StickerPickerOpened> = ({ setIsOpened, onSelect }) => {
   const addRecentSticker = (url: string) => {
     const added = [...new Set([url, ...recentStickers])];
 
-    localStorage.setItem("fireverse-recent-stickers", JSON.stringify(added));
+    localStorage.setItem("tarchat-recent-stickers", JSON.stringify(added));
 
     setRecentStickers(added);
   };
