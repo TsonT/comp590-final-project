@@ -88,9 +88,9 @@ const LeftMessage: FC<LeftMessageProps> = ({
               <div
                 onClick={(e) => e.stopPropagation()}
                 title={formattedDate}
-                className={`bg-dark-lighten rounded-lg p-2 text-white ${
+                className={`rounded-lg bg-dark-lighten p-2 text-white ${
                   conversation.users.length === 2
-                    ? "after:border-dark-lighten relative after:absolute after:right-full after:bottom-[6px] after:border-8 after:border-t-transparent after:border-l-transparent"
+                    ? "relative after:absolute after:right-full after:bottom-[6px] after:border-8 after:border-dark-lighten after:border-t-transparent after:border-l-transparent"
                     : ""
                 }`}
               >
@@ -135,7 +135,7 @@ const LeftMessage: FC<LeftMessageProps> = ({
           <div
             onClick={(e) => e.stopPropagation()}
             title={formattedDate}
-            className="bg-dark-lighten flex items-center gap-2 overflow-hidden rounded-lg py-3 px-5"
+            className="flex items-center gap-2 overflow-hidden rounded-lg bg-dark-lighten py-3 px-5"
           >
             <FileIcon
               className="h-4 w-4 object-cover"
@@ -171,49 +171,12 @@ const LeftMessage: FC<LeftMessageProps> = ({
           <div
             onClick={(e) => e.stopPropagation()}
             title={formattedDate}
-            className="border-dark-lighten rounded-lg border p-3 text-gray-400"
+            className="rounded-lg border border-dark-lighten p-3 text-gray-400"
           >
             Message has been removed
           </div>
         )}
 
-        {message.type !== "removed" && (
-          <>
-            <button
-              onClick={() => setIsSelectReactionOpened(true)}
-              className="text-lg text-gray-500 opacity-0 transition hover:text-gray-300 group-hover:opacity-100"
-            >
-              <i className="bx bx-smile"></i>
-            </button>
-            <button
-              onClick={(e) => {
-                setReplyInfo(message);
-                e.stopPropagation();
-              }}
-              className="text-gray-500 opacity-0 transition hover:text-gray-300 group-hover:opacity-100"
-            >
-              <ReplyIcon />
-            </button>
-
-            {isSelectReactionOpened && (
-              <ClickAwayListener
-                onClickAway={() => setIsSelectReactionOpened(false)}
-              >
-                {(ref) => (
-                  <ReactionPopup
-                    position={"left"}
-                    forwardedRef={ref}
-                    setIsOpened={setIsSelectReactionOpened}
-                    messageId={message.id as string}
-                    currentReaction={
-                      message.reactions?.[currentUser?.uid as string] || 0
-                    }
-                  />
-                )}
-              </ClickAwayListener>
-            )}
-          </>
-        )}
         {Object.keys(message.reactions || {}).length > 0 && (
           <ReactionStatus
             message={message}

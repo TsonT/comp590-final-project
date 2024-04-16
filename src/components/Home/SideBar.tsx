@@ -60,16 +60,10 @@ const SideBar: FC = () => {
             <ClickAwayListener onClickAway={() => setIsDropdownOpened(false)}>
               {(ref) => (
                 <div ref={ref} className="relative z-10">
-                  <img
+                  <button
                     onClick={() => setIsDropdownOpened((prev) => !prev)}
                     className="h-8 w-8 cursor-pointer rounded-full object-cover"
-                    src={
-                      currentUser?.photoURL
-                        ? IMAGE_PROXY(currentUser.photoURL)
-                        : DEFAULT_AVATAR
-                    }
-                    alt=""
-                  />
+                  ></button>
 
                   <div
                     className={`absolute top-full right-0 flex w-max origin-top-right flex-col items-stretch overflow-hidden rounded-md border border-dark-lighten bg-dark py-1 shadow-lg transition-all duration-200 ${

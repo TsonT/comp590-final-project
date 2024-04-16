@@ -27,47 +27,12 @@ const ChatHeader: FC<ChatHeaderProps> = ({ conversation }) => {
 
   return (
     <>
-      <div className="border-dark-lighten flex h-20 items-center justify-between border-b px-5">
+      <div className="flex h-20 items-center justify-between border-b border-dark-lighten px-5">
         <div className="flex flex-grow items-center gap-3">
           <Link to="/" className="md:hidden">
-            <i className="bx bxs-chevron-left text-primary text-3xl"></i>
+            <i className="bx bxs-chevron-left text-3xl text-primary"></i>
           </Link>
-          {loading ? (
-            <Skeleton className="h-10 w-10 rounded-full" />
-          ) : (
-            <>
-              {conversation.users.length === 2 ? (
-                <img
-                  className="h-10 w-10 rounded-full"
-                  src={IMAGE_PROXY(filtered?.[0]?.data()?.photoURL)}
-                  alt=""
-                />
-              ) : (
-                <>
-                  {conversation?.group?.groupImage ? (
-                    <img
-                      className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
-                      src={conversation.group.groupImage}
-                      alt=""
-                    />
-                  ) : (
-                    <div className="relative h-10 w-10 flex-shrink-0">
-                      <img
-                        className="absolute top-0 right-0 h-7 w-7 flex-shrink-0 rounded-full object-cover"
-                        src={IMAGE_PROXY(filtered?.[0]?.data()?.photoURL)}
-                        alt=""
-                      />
-                      <img
-                        className={`border-dark absolute bottom-0 left-0 z-[1] h-7 w-7 flex-shrink-0 rounded-full border-2 object-cover transition duration-300`}
-                        src={IMAGE_PROXY(filtered?.[1]?.data()?.photoURL)}
-                        alt=""
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
+          {loading ? <Skeleton className="h-10 w-10 rounded-full" /> : <></>}
 
           {loading ? (
             <Skeleton className="h-6 w-1/4" />
@@ -87,13 +52,9 @@ const ChatHeader: FC<ChatHeaderProps> = ({ conversation }) => {
           <>
             {conversation.users.length > 2 && (
               <button onClick={() => setIsGroupMembersOpened(true)}>
-                <i className="bx bxs-group text-primary text-2xl"></i>
+                <i className="bx bxs-group text-2xl text-primary"></i>
               </button>
             )}
-
-            <button onClick={() => setIsConversationSettingsOpened(true)}>
-              <i className="bx bxs-info-circle text-primary text-2xl"></i>
-            </button>
           </>
         )}
       </div>

@@ -48,15 +48,6 @@ const SignIn: FC = () => {
               <img className="h-8 w-8" src="/icon.svg" alt="" />
               <span className="text-2xl">TarChat</span>
             </div>
-            <a
-              href="https://github.com/napthedev/tarchat"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xl"
-            >
-              <i className="bx bxl-github"></i>
-              <span>Github</span>
-            </a>
           </div>
 
           <div className="flex flex-col-reverse gap-10 md:mt-5 md:flex-row md:gap-5 lg:mt-10">
