@@ -138,11 +138,6 @@ const CreateConversation: FC<CreateConversationProps> = ({ setIsOpened }) => {
                       checked={selected.includes(doc.data().uid)}
                       readOnly
                     />
-                    <img
-                      className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-                      src={IMAGE_PROXY(doc.data().photoURL)}
-                      alt=""
-                    />
                     <p>{doc.data().displayName}</p>
                   </div>
                 ))}

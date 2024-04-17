@@ -322,7 +322,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       {previewFiles.length > 0 && (
-        <div className="flex h-32 items-center gap-2 border-t border-dark-lighten px-4">
+        <div className="border-dark-lighten flex h-32 items-center gap-2 border-t px-4">
           {previewFiles.map((preview) => (
             <div key={preview} className="relative">
               <img className="h-28 w-28 object-cover" src={preview} alt="" />
@@ -334,14 +334,14 @@ const InputSection: FC<InputSectionProps> = ({
                 }
                 className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-100"
               >
-                <i className="bx bx-x text-lg text-dark"></i>
+                <i className="bx bx-x text-dark text-lg"></i>
               </button>
             </div>
           ))}
         </div>
       )}
       {previewFiles.length === 0 && !!replyInfo && (
-        <div className="flex h-[76px] justify-between border-t border-dark-lighten p-4">
+        <div className="border-dark-lighten flex h-[76px] justify-between border-t p-4">
           <div>
             <div className="flex items-center gap-2">
               <ReplyIcon />
@@ -371,7 +371,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       <div
-        className={`flex h-16 items-stretch gap-1 border-t border-dark-lighten px-4 ${
+        className={`border-dark-lighten flex h-16 items-stretch gap-1 border-t px-4 ${
           disabled ? "pointer-events-none select-none" : ""
         }`}
       >
@@ -420,7 +420,7 @@ const InputSection: FC<InputSectionProps> = ({
               }}
               onKeyDown={handleReplaceEmoji}
               onPaste={handlePaste}
-              className="h-9 w-full rounded-full bg-dark-lighten pl-3 pr-10 outline-none"
+              className="bg-dark-lighten h-9 w-full rounded-full pl-3 pr-10 outline-none"
               type="text"
               placeholder="Message..."
             />
@@ -428,10 +428,7 @@ const InputSection: FC<InputSectionProps> = ({
               type="button"
               onClick={() => setIsIconPickerOpened(true)}
               className="absolute right-2 top-1/2 -translate-y-1/2"
-            >
-              <i className="bx bxs-smile text-2xl text-primary"></i>
-            </button>
-
+            ></button>
             {isIconPickerOpened && (
               <ClickAwayListener
                 onClickAway={() => setIsIconPickerOpened(false)}
@@ -459,7 +456,7 @@ const InputSection: FC<InputSectionProps> = ({
               <Spin width="24px" height="24px" color="#0D90F3" />
             </div>
           ) : (
-            <button className="flex flex-shrink-0 items-center text-2xl text-primary">
+            <button className="text-primary flex flex-shrink-0 items-center text-2xl">
               <i className="bx bxs-send"></i>
             </button>
           )}
