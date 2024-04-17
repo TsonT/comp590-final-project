@@ -82,7 +82,7 @@ const RightMessage: FC<RightMessageProps> = ({ message, setReplyInfo }) => {
               <div
                 onClick={(e) => e.stopPropagation()}
                 title={formattedDate}
-                className={`bg-primary after:border-primary relative rounded-lg p-2 text-white after:absolute after:left-full after:bottom-[6px] after:border-8 after:border-t-transparent after:border-r-transparent`}
+                className={`relative rounded-lg bg-primary p-2 text-white after:absolute after:left-full after:bottom-[6px] after:border-8 after:border-primary after:border-t-transparent after:border-r-transparent`}
               >
                 {splitLinkFromMessage(message.content).map((item, index) => (
                   <Fragment key={index}>
@@ -125,7 +125,7 @@ const RightMessage: FC<RightMessageProps> = ({ message, setReplyInfo }) => {
           <div
             onClick={(e) => e.stopPropagation()}
             title={formattedDate}
-            className="bg-dark-lighten flex items-center gap-2 overflow-hidden rounded-lg py-3 px-5"
+            className="flex items-center gap-2 overflow-hidden rounded-lg bg-dark-lighten py-3 px-5"
           >
             <FileIcon
               className="h-4 w-4 object-cover"
@@ -161,63 +161,10 @@ const RightMessage: FC<RightMessageProps> = ({ message, setReplyInfo }) => {
           <div
             onClick={(e) => e.stopPropagation()}
             title={formattedDate}
-            className="border-dark-lighten rounded-lg border p-3 text-gray-400"
+            className="rounded-lg border border-dark-lighten p-3 text-gray-400"
           >
             Message has been removed
           </div>
-        )}
-
-        {message.type !== "removed" && (
-          <>
-            <button
-              onClick={() => setIsSelectReactionOpened(true)}
-              className="text-lg text-gray-500 opacity-0 transition hover:text-gray-300 group-hover:opacity-100"
-            >
-              <i className="bx bx-smile"></i>
-            </button>
-
-            <button
-              onClick={(e) => {
-                setReplyInfo(message);
-                e.stopPropagation();
-              }}
-              className="text-gray-500 opacity-0 transition hover:text-gray-300 group-hover:opacity-100"
-            >
-              <ReplyIcon />
-            </button>
-
-            <button
-              onClick={(e) => {
-                removeMessage(message.id as string);
-                e.stopPropagation();
-              }}
-              className="text-lg text-gray-500 opacity-0 transition hover:text-gray-300 group-hover:opacity-100"
-            >
-              <i className="bx bxs-trash"></i>
-            </button>
-
-            {isSelectReactionOpened && (
-              <ClickAwayListener
-                onClickAway={() => setIsSelectReactionOpened(false)}
-              >
-                {(ref) => (
-                  <ReactionPopup
-                    position="right"
-                    forwardedRef={ref}
-                    setIsOpened={setIsSelectReactionOpened}
-                    messageId={message.id as string}
-                    currentReaction={
-                      message.reactions?.[currentUser?.uid as string] || 0
-                    }
-                  />
-                )}
-              </ClickAwayListener>
-            )}
-
-            {Object.keys(message.reactions || {}).length > 0 && (
-              <ReactionStatus message={message} position="right" />
-            )}
-          </>
         )}
       </div>
     </div>

@@ -375,12 +375,6 @@ const InputSection: FC<InputSectionProps> = ({
           disabled ? "pointer-events-none select-none" : ""
         }`}
       >
-        <button
-          onClick={() => imageInputRef.current?.click()}
-          className="text-primary flex flex-shrink-0 items-center text-2xl"
-        >
-          <i className="bx bxs-image-add"></i>
-        </button>
         <input
           ref={imageInputRef}
           hidden
@@ -389,12 +383,6 @@ const InputSection: FC<InputSectionProps> = ({
           accept="image/*"
           onChange={handleFileInputChange}
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="text-primary flex flex-shrink-0 items-center text-2xl"
-        >
-          <i className="bx bx-link-alt"></i>
-        </button>
         <input
           ref={fileInputRef}
           hidden
@@ -409,26 +397,12 @@ const InputSection: FC<InputSectionProps> = ({
               onSelect={sendSticker}
             />
           )}
-
-          <button
-            onClick={() => setIsStickerPickerOpened(true)}
-            className="flex items-center"
-          >
-            <StickerIcon />
-          </button>
         </div>
 
         <div className="relative flex flex-shrink-0 items-center">
           {isGifPickerOpened && (
             <GifPicker setIsOpened={setIsGifPickerOpened} onSelect={sendGif} />
           )}
-
-          <button
-            onClick={() => setIsGifPickerOpened(true)}
-            className="flex items-center"
-          >
-            <GifIcon />
-          </button>
         </div>
 
         <form
@@ -454,10 +428,7 @@ const InputSection: FC<InputSectionProps> = ({
               type="button"
               onClick={() => setIsIconPickerOpened(true)}
               className="absolute right-2 top-1/2 -translate-y-1/2"
-            >
-              <i className="bx bxs-smile text-primary text-2xl"></i>
-            </button>
-
+            ></button>
             {isIconPickerOpened && (
               <ClickAwayListener
                 onClickAway={() => setIsIconPickerOpened(false)}

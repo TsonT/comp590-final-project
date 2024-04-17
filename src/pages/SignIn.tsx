@@ -46,17 +46,8 @@ const SignIn: FC = () => {
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
               <img className="h-8 w-8" src="/icon.svg" alt="" />
-              <span className="text-2xl">FireVerse</span>
+              <span className="text-2xl">TarChat</span>
             </div>
-            <a
-              href="https://github.com/napthedev/fireverse"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xl"
-            >
-              <i className="bx bxl-github"></i>
-              <span>Github</span>
-            </a>
           </div>
 
           <div className="flex flex-col-reverse gap-10 md:mt-5 md:flex-row md:gap-5 lg:mt-10">
@@ -81,16 +72,6 @@ const SignIn: FC = () => {
                 <img className="h-6 w-6" src="/google.svg" alt="" />
 
                 <span>Sign In With Google</span>
-              </button>
-
-              <button
-                disabled={loading}
-                onClick={() => handleSignIn(new FacebookAuthProvider())}
-                className="bg-primary flex min-w-[250px] cursor-pointer items-center gap-3 rounded-md p-3 text-white transition duration-300 hover:brightness-90 disabled:!cursor-default disabled:!brightness-75"
-              >
-                <img className="h-6 w-6" src="/facebook.svg" alt="" />
-
-                <span>Sign In With Facebook</span>
               </button>
             </div>
           </div>
