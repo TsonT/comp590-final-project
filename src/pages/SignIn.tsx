@@ -5,12 +5,24 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { FC, useState } from "react";
-
 import Alert from "../components/Alert";
 import { Navigate } from "react-router-dom";
 import { auth } from "../shared/firebase";
 import { useQueryParams } from "../hooks/useQueryParams";
 import { useStore } from "../store";
+import sodium from "libsodium-wrappers";
+import { db } from "../shared/firebase";
+
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 
 const SignIn: FC = () => {
   const { redirect } = useQueryParams();
@@ -21,20 +33,76 @@ const SignIn: FC = () => {
   const [error, setError] = useState("");
   const [isAlertOpened, setIsAlertOpened] = useState(false);
 
-  const handleSignIn = (provider: AuthProvider) => {
+  // Function to generate the bundle
+  // TODO generate more prekeys
+  const generateBundle = async () => {
+    await sodium.ready;
+    const generateKeyPair = () => sodium.crypto_kx_keypair();
+
+    const identityKeyPair = sodium.crypto_sign_keypair();
+    const identityPublicKey = identityKeyPair.publicKey;
+    const identityPrivateKey = identityKeyPair.privateKey;
+
+    const signedPrekeyPair = generateKeyPair();
+    const signedPrekeyPublicKey = signedPrekeyPair.publicKey;
+    const signedPrekeyPrivateKey = signedPrekeyPair.privateKey;
+
+    const oneTimePrekeyPair = generateKeyPair();
+    const oneTimePrekeyPublicKey = oneTimePrekeyPair.publicKey;
+    const oneTimePrekeyPrivateKey = oneTimePrekeyPair.privateKey;
+
+    const bundle = {
+      identityKey: identityPublicKey,
+      signedPrekey: signedPrekeyPublicKey,
+      signedPrekeySignature: sodium.crypto_sign_detached(
+        signedPrekeyPublicKey,
+        identityPrivateKey
+      ),
+      oneTimePrekeys: [oneTimePrekeyPublicKey],
+    };
+
+    return bundle;
+  };
+
+  const storeBundle = async (bundle: any, user: any) => {
+    const bundleWithBase64 = {
+      identityKey: btoa(String.fromCharCode.apply(null, bundle.identityKey)),
+      signedPrekey: btoa(String.fromCharCode.apply(null, bundle.signedPrekey)),
+      signedPrekeySignature: btoa(
+        String.fromCharCode.apply(null, bundle.signedPrekeySignature)
+      ),
+      oneTimePrekeys: bundle.oneTimePrekeys.map((key: Uint8Array) =>
+        btoa(String.fromCharCode.apply(null, key))
+      ),
+    };
+
+    updateDoc(doc(db, "users", user.uid), {
+      bundle: bundleWithBase64,
+    });
+  };
+
+  const handleSignIn = async (provider: AuthProvider) => {
     setLoading(true);
 
-    signInWithPopup(auth, provider)
-      .then((res) => {
-        console.log(res.user);
-      })
-      .catch((err) => {
-        setIsAlertOpened(true);
-        setError(`Error: ${err.code}`);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      signInWithPopup(auth, provider)
+        .then(async (res) => {
+          console.log(res.user);
+          const bundle = await generateBundle();
+          storeBundle(bundle, res.user);
+        })
+        .catch((err) => {
+          setIsAlertOpened(true);
+          setError(`Error: ${err.code}`);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } catch (err) {
+      setIsAlertOpened(true);
+      setError(`Error generating bundle: ${err.message}`);
+      setLoading(false);
+    }
   };
 
   if (currentUser) return <Navigate to={redirect || "/"} />;
