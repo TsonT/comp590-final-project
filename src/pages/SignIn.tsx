@@ -114,7 +114,7 @@ const SignIn: FC = () => {
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
               <img className="h-8 w-8" src="/icon.svg" alt="" />
-              <span className="text-2xl">TarChat</span>
+              <span className="text-2xl text-unc-blue font-fun">TarChat</span>
             </div>
           </div>
 
@@ -125,11 +125,11 @@ const SignIn: FC = () => {
 
             <div className="mt-12 flex flex-1 flex-col items-center gap-4 md:items-start lg:mt-24">
               <h1 className="text-center text-3xl md:text-left md:text-4xl">
-                The best place for messaging
+                A chat by Tarheels, for Tarheels
               </h1>
-              <p className="text-center text-xl md:text-left md:text-2xl">
+              <p className="text-center text-xl md:text-left md:text-2xl text-unc-blue font-fun">
                 It's free, fast and secure. We make it easy and fun to stay
-                close to your favourite people.
+                close to your favourite people with TarChat.
               </p>
 
               <button

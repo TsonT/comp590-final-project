@@ -37,7 +37,7 @@ const CreateConversation: FC<CreateConversationProps> = ({ setIsOpened }) => {
     if (selected.includes(uid)) {
       setSelected(selected.filter((item) => item !== uid));
     } else {
-      setSelected([...selected, uid]);
+      setSelected([uid]);
     }
   };
 
@@ -130,21 +130,33 @@ const CreateConversation: FC<CreateConversationProps> = ({ setIsOpened }) => {
                   <div
                     key={doc.data().uid}
                     onClick={() => handleToggle(doc.data().uid)}
-                    className="hover:bg-dark-lighten flex cursor-pointer items-center gap-2 px-5 py-2 transition"
+                    className="flex items-center gap-2 px-5 py-2 transition"
+                    style={{
+                      backgroundColor: selected.includes(doc.data().uid) ? '#1E40AF' : 'transparent',
+                      color: selected.includes(doc.data().uid) ? '#FFFFFF' : '#000000',
+                      cursor: 'pointer',
+                    }}
                   >
-                    <input
+                    <button
                       className="flex-shrink-0 cursor-pointer"
-                      type="checkbox"
-                      checked={selected.includes(doc.data().uid)}
-                      readOnly
-                    />
-                    <p>{doc.data().displayName}</p>
+                      onClick={() => handleToggle(doc.data().uid)}
+                      style={{
+                        backgroundColor: selected.includes(doc.data().uid) ? '#1E40AF' : '#E5E7EB',
+                        color: selected.includes(doc.data().uid) ? '#FFFFFF' : '#000000',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        padding: '0.5rem 1rem',
+                        transition: 'background-color 0.3s',
+                      }}
+                    >
+                      {doc.data().displayName}
+                    </button>
                   </div>
                 ))}
             </div>
             <div className="border-dark-lighten flex justify-end border-t p-3">
               <button
-                disabled={selected.length === 0}
+                disabled={!selected.length}
                 onClick={handleCreateConversation}
                 className="bg-dark-lighten rounded-lg py-2 px-3 transition duration-300 hover:brightness-125 disabled:!brightness-[80%]"
               >
