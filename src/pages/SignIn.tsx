@@ -66,13 +66,17 @@ const SignIn: FC = () => {
 
   const storeBundle = async (bundle: any, user: any) => {
     const bundleWithBase64 = {
-      identityKey: btoa(String.fromCharCode.apply(null, bundle.identityKey)),
-      signedPrekey: btoa(String.fromCharCode.apply(null, bundle.signedPrekey)),
-      signedPrekeySignature: btoa(
+      identityKey: window.btoa(
+        String.fromCharCode.apply(null, bundle.identityKey)
+      ),
+      signedPrekey: window.btoa(
+        String.fromCharCode.apply(null, bundle.signedPrekey)
+      ),
+      signedPrekeySignature: window.btoa(
         String.fromCharCode.apply(null, bundle.signedPrekeySignature)
       ),
       oneTimePrekeys: bundle.oneTimePrekeys.map((key: Uint8Array) =>
-        btoa(String.fromCharCode.apply(null, key))
+        window.btoa(String.fromCharCode.apply(null, key))
       ),
     };
 
@@ -114,7 +118,7 @@ const SignIn: FC = () => {
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
               <img className="h-8 w-8" src="/icon.svg" alt="" />
-              <span className="text-2xl text-unc-blue font-fun">TarChat</span>
+              <span className="text-unc-blue font-fun text-2xl">TarChat</span>
             </div>
           </div>
 
@@ -127,7 +131,7 @@ const SignIn: FC = () => {
               <h1 className="text-center text-3xl md:text-left md:text-4xl">
                 A chat by Tarheels, for Tarheels
               </h1>
-              <p className="text-center text-xl md:text-left md:text-2xl text-unc-blue font-fun">
+              <p className="text-unc-blue font-fun text-center text-xl md:text-left md:text-2xl">
                 It's free, fast and secure. We make it easy and fun to stay
                 close to your favourite people with TarChat.
               </p>
