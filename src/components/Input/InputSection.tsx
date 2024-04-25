@@ -32,7 +32,11 @@ import ReplyIcon from "../Icon/ReplyIcon";
 import Spin from "react-cssfx-loading/src/Spin";
 import StickerIcon from "../Icon/StickerIcon";
 import StickerPicker from "./StickerPicker";
-import { formatFileName } from "../../shared/utils";
+import {
+  formatFileName,
+  encodeUint8ArrayPropsToBase64,
+  decodeBase64PropsToUint8Array,
+} from "../../shared/utils";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
 import sodium from "libsodium-wrappers";
@@ -125,15 +129,6 @@ const InputSection: FC<InputSectionProps> = ({
     return messages.length === 0;
   };
 
-  function decodeBase64ToUint8Array(base64String: string): Uint8Array {
-    const binaryString = window.atob(base64String);
-    const uint8Array = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      uint8Array[i] = binaryString.charCodeAt(i);
-    }
-    return uint8Array;
-  }
-
   const fetchBundle = async (UId: any) => {
     try {
       const UIdDocRef = doc(db, "users", UId);
@@ -142,21 +137,11 @@ const InputSection: FC<InputSectionProps> = ({
 
       if (!UIdDocSnapshot.exists()) {
         console.log("UId document does not exist");
-        return null;
       }
 
       const bundleWithBase64 = UIdDocSnapshot.data().bundle;
 
-      const bundle = {
-        identityKey: decodeBase64ToUint8Array(bundleWithBase64.identityKey),
-        signedPrekey: decodeBase64ToUint8Array(bundleWithBase64.signedPrekey),
-        signedPrekeySignature: decodeBase64ToUint8Array(
-          bundleWithBase64.signedPrekeySignature
-        ),
-        oneTimePrekeys: bundleWithBase64.oneTimePrekeys.map(
-          (keyBase64: string) => decodeBase64ToUint8Array(keyBase64)
-        ),
-      };
+      const bundle = decodeBase64PropsToUint8Array(bundleWithBase64);
 
       return bundle;
     } catch (error) {
@@ -204,7 +189,7 @@ const InputSection: FC<InputSectionProps> = ({
     return CryptoJS.PBKDF2(CryptoJS.lib.WordArray.create(input), "TarChat", {
       keySize: keyLength * 4,
       iterations: 10,
-    });
+    }).toString(CryptoJS.enc.Base64);
   }
 
   const generateSK = async (
@@ -238,18 +223,10 @@ const InputSection: FC<InputSectionProps> = ({
 
     const SK = kdf(concatenatedDH, 32);
 
-    return SK.toString(CryptoJS.enc.Base64);
+    return SK;
   };
 
-  const initiateX3DH = async () => {
-    const listenerUId = await fetchListenerUId();
-    console.log(listenerUId);
-    const listenerBundle = await fetchBundle(listenerUId);
-    console.log(listenerBundle);
-    const currentUserId = currentUser?.uid;
-    const currentUserBundle = await fetchBundle(currentUserId);
-    console.log(currentUserBundle);
-
+  const initiateX3DH = async (senderBundle: any, listenerBundle: any) => {
     const isVerified = verifyBundle(listenerBundle);
 
     if (!isVerified) {
@@ -263,7 +240,7 @@ const InputSection: FC<InputSectionProps> = ({
     const ephemeralPrivateKey = ephemeralKeyPair.privateKey;
 
     const SK = await generateSK(
-      currentUserBundle,
+      senderBundle,
       listenerBundle,
       ephemeralPublicKey
     );
@@ -271,6 +248,89 @@ const InputSection: FC<InputSectionProps> = ({
     console.log(SK);
 
     //TODO store SK locally
+
+    return SK;
+  };
+
+  function encode(str: any) {
+    const encoder = new TextEncoder();
+    return encoder.encode(str);
+  }
+  function RatchetKDF(input: any) {
+    const key = kdf(input, 64);
+
+    return {
+      key1: key.slice(0, 32),
+      key2: key.slice(32, 64),
+    };
+  }
+
+  const createMessageBundle = async (
+    receiverPK: any,
+    rootDHKey: any,
+    senderBundle: any,
+    listenerBundle: any,
+    message: string
+  ) => {
+    const senderDHKeys = sodium.crypto_kx_keypair();
+
+    const DHvalue = sodium.crypto_kx_client_session_keys(
+      senderDHKeys.publicKey,
+      senderDHKeys.privateKey,
+      receiverPK
+    );
+
+    const combinedKey = new Uint8Array([
+      ...encode(DHvalue),
+      ...encode(rootDHKey),
+    ]);
+
+    const DHRatchetOutput = RatchetKDF(combinedKey);
+
+    const sendingRatchetOutput = RatchetKDF(DHRatchetOutput.key2);
+
+    const AD = new Uint8Array([
+      ...encode(senderBundle.identityKey),
+      ...encode(listenerBundle.identityKey),
+    ]);
+
+    const nonce = sodium.randombytes_buf(
+      sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
+    );
+
+    const encryptedMessage = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+      message,
+      AD,
+      null,
+      nonce,
+      sendingRatchetOutput.key2
+    );
+
+    const messageBundle = {
+      encryptedMessage: encryptedMessage,
+      nonce: nonce,
+      DHPublicKey: senderDHKeys.publicKey,
+      AD: AD,
+    };
+
+    return messageBundle;
+  };
+
+  const storeMessageBundle = async (
+    messageBundle: any,
+    conversationId: any
+  ) => {
+    const encodedMessageBundle = encodeUint8ArrayPropsToBase64(messageBundle);
+    addDoc(
+      collection(db, "conversations", conversationId as string, "messages"),
+      {
+        sender: currentUser?.uid,
+        content: encodedMessageBundle,
+        type: "text",
+        createdAt: serverTimestamp(),
+        replyTo: replyInfo?.id || null,
+      }
+    );
   };
 
   const handleFormSubmit = async (e: FormEvent) => {
@@ -294,8 +354,28 @@ const InputSection: FC<InputSectionProps> = ({
     if (!inputValue.trim()) return;
 
     if (await isFirstMessage(conversationId)) {
-      console.log("First Message!");
-      initiateX3DH();
+      const listenerUId = await fetchListenerUId();
+      console.log(listenerUId);
+
+      const listenerBundle = await fetchBundle(listenerUId);
+      console.log(listenerBundle);
+
+      const currentUserId = currentUser?.uid;
+      const senderBundle = await fetchBundle(currentUserId);
+      console.log(senderBundle);
+
+      const SK = initiateX3DH(senderBundle, listenerBundle);
+
+      const messageBundle = await createMessageBundle(
+        listenerBundle.signedPrekey,
+        SK,
+        senderBundle,
+        listenerBundle,
+        inputValue
+      );
+      console.log(messageBundle);
+
+      await storeMessageBundle(messageBundle, conversationId);
     } else {
       console.log("Other!");
     }
@@ -515,7 +595,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       {previewFiles.length > 0 && (
-        <div className="flex h-32 items-center gap-2 border-t border-dark-lighten px-4">
+        <div className="border-dark-lighten flex h-32 items-center gap-2 border-t px-4">
           {previewFiles.map((preview) => (
             <div key={preview} className="relative">
               <img className="h-28 w-28 object-cover" src={preview} alt="" />
@@ -527,14 +607,14 @@ const InputSection: FC<InputSectionProps> = ({
                 }
                 className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-100"
               >
-                <i className="bx bx-x text-lg text-dark"></i>
+                <i className="bx bx-x text-dark text-lg"></i>
               </button>
             </div>
           ))}
         </div>
       )}
       {previewFiles.length === 0 && !!replyInfo && (
-        <div className="flex h-[76px] justify-between border-t border-dark-lighten p-4">
+        <div className="border-dark-lighten flex h-[76px] justify-between border-t p-4">
           <div>
             <div className="flex items-center gap-2">
               <ReplyIcon />
@@ -564,7 +644,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       <div
-        className={`flex h-16 items-stretch gap-1 border-t border-dark-lighten px-4 ${
+        className={`border-dark-lighten flex h-16 items-stretch gap-1 border-t px-4 ${
           disabled ? "pointer-events-none select-none" : ""
         }`}
       >
@@ -613,7 +693,7 @@ const InputSection: FC<InputSectionProps> = ({
               }}
               onKeyDown={handleReplaceEmoji}
               onPaste={handlePaste}
-              className="h-9 w-full rounded-full bg-dark-lighten pl-3 pr-10 outline-none"
+              className="bg-dark-lighten h-9 w-full rounded-full pl-3 pr-10 outline-none"
               type="text"
               placeholder="Message..."
             />
@@ -649,7 +729,7 @@ const InputSection: FC<InputSectionProps> = ({
               <Spin width="24px" height="24px" color="#0D90F3" />
             </div>
           ) : (
-            <button className="flex flex-shrink-0 items-center text-2xl text-primary">
+            <button className="text-primary flex flex-shrink-0 items-center text-2xl">
               <i className="bx bxs-send"></i>
             </button>
           )}
