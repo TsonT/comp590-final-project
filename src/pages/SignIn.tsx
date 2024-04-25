@@ -12,6 +12,7 @@ import { useQueryParams } from "../hooks/useQueryParams";
 import { useStore } from "../store";
 import sodium from "libsodium-wrappers";
 import { db } from "../shared/firebase";
+import { encodeUint8ArrayPropsToBase64 } from "../shared/utils";
 
 import {
   addDoc,
@@ -65,20 +66,7 @@ const SignIn: FC = () => {
   };
 
   const storeBundle = async (bundle: any, user: any) => {
-    const bundleWithBase64 = {
-      identityKey: window.btoa(
-        String.fromCharCode.apply(null, bundle.identityKey)
-      ),
-      signedPrekey: window.btoa(
-        String.fromCharCode.apply(null, bundle.signedPrekey)
-      ),
-      signedPrekeySignature: window.btoa(
-        String.fromCharCode.apply(null, bundle.signedPrekeySignature)
-      ),
-      oneTimePrekeys: bundle.oneTimePrekeys.map((key: Uint8Array) =>
-        window.btoa(String.fromCharCode.apply(null, key))
-      ),
-    };
+    const bundleWithBase64 = encodeUint8ArrayPropsToBase64(bundle);
 
     updateDoc(doc(db, "users", user.uid), {
       bundle: bundleWithBase64,
