@@ -13,6 +13,7 @@ import { useStore } from "../store";
 import sodium from "libsodium-wrappers";
 import { db } from "../shared/firebase";
 import { encodeUint8ArrayPropsToBase64 } from "../shared/utils";
+import fs from "fs";
 
 import {
   addDoc,
