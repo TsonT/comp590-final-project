@@ -12,12 +12,14 @@ import { useQueryParams } from "../hooks/useQueryParams";
 import { useStore } from "../store";
 import sodium from "libsodium-wrappers";
 import { db } from "../shared/firebase";
+import {fs} from "fs";
 
 import {
   addDoc,
   collection,
   doc,
-  getDocs,
+  getDoc,
+  getDocs, //Deals with firebase
   query,
   serverTimestamp,
   updateDoc,
@@ -56,12 +58,32 @@ const SignIn: FC = () => {
       signedPrekey: signedPrekeyPublicKey,
       signedPrekeySignature: sodium.crypto_sign_detached(
         signedPrekeyPublicKey,
-        identityPrivateKey
+        identityPrivateKey //signing with the private key. Signature is stored but not the private key it signs with
       ),
       oneTimePrekeys: [oneTimePrekeyPublicKey],
     };
 
     return bundle;
+  };
+  
+  /*const downloadKeysAsJson = (privateKeys: any) => {
+    const json = JSON.stringify(privateKeys);
+    const blob = new Blob([json], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = "privateKeys.json";  // Name of the file to be downloaded
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+  };*/
+
+  const saveKeysToFile = (privateKeys: any) => {
+    const json = JSON.stringify(privateKeys);
+    const filePath = './src/pages/localKeys.json'; // Adjust the path as necessary
+  
+    fs.writeFileSync(filePath, json, 'utf8');
   };
 
   const storeBundle = async (bundle: any, user: any) => {
@@ -91,8 +113,18 @@ const SignIn: FC = () => {
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
-          console.log(res.user);
+          const userSnapshot = await getDoc(doc(db, "users", res.user.uid));
           const bundle = await generateBundle();
+          if (userSnapshot.exists()) {
+            console.log("NOT First time user");
+            const privateKeys = {
+              identityPrivateKey: bundle.identityKey, // Assuming you modify generateBundle to include this
+              signedPrekeyPrivateKey: bundle.signedPrekey, // Assuming included
+              oneTimePrekeyPrivateKey: bundle.oneTimePrekeys[0], // Assuming included
+            };
+            saveKeysToFile(privateKeys);
+          }
+          console.log(res.user);
           storeBundle(bundle, res.user);
         })
         .catch((err) => {
@@ -108,6 +140,7 @@ const SignIn: FC = () => {
       setLoading(false);
     }
   };
+  
 
   if (currentUser) return <Navigate to={redirect || "/"} />;
 
