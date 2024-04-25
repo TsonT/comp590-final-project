@@ -13,6 +13,10 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -31,6 +35,8 @@ import StickerPicker from "./StickerPicker";
 import { formatFileName } from "../../shared/utils";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
+import sodium from "libsodium-wrappers";
+import * as CryptoJS from "crypto-js";
 
 const Picker = lazy(() => import("./EmojiPicker"));
 
@@ -87,6 +93,186 @@ const InputSection: FC<InputSectionProps> = ({
     textInputRef.current?.focus();
   }, [conversationId]);
 
+  const fetchMessages = async (conversationId: string) => {
+    try {
+      const messagesCollectionRef = collection(
+        db,
+        "conversations",
+        conversationId,
+        "messages"
+      );
+
+      // Query to get messages ordered by createdAt timestamp
+      const q = query(messagesCollectionRef, orderBy("createdAt"));
+
+      // Get all documents in the messages collection
+      const querySnapshot = await getDocs(q);
+
+      // Extract messages data from the query snapshot
+      const messages = querySnapshot.docs.map((doc) => doc.data());
+
+      return messages;
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return []; // Return an empty array if there's an error
+    }
+  };
+
+  const isFirstMessage = async (conversationId: any) => {
+    const messages = await fetchMessages(conversationId);
+
+    // Check if there are no messages in the conversation
+    return messages.length === 0;
+  };
+
+  function decodeBase64ToUint8Array(base64String: string): Uint8Array {
+    const binaryString = window.atob(base64String);
+    const uint8Array = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      uint8Array[i] = binaryString.charCodeAt(i);
+    }
+    return uint8Array;
+  }
+
+  const fetchBundle = async (UId: any) => {
+    try {
+      const UIdDocRef = doc(db, "users", UId);
+
+      const UIdDocSnapshot = await getDoc(UIdDocRef);
+
+      if (!UIdDocSnapshot.exists()) {
+        console.log("UId document does not exist");
+        return null;
+      }
+
+      const bundleWithBase64 = UIdDocSnapshot.data().bundle;
+
+      const bundle = {
+        identityKey: decodeBase64ToUint8Array(bundleWithBase64.identityKey),
+        signedPrekey: decodeBase64ToUint8Array(bundleWithBase64.signedPrekey),
+        signedPrekeySignature: decodeBase64ToUint8Array(
+          bundleWithBase64.signedPrekeySignature
+        ),
+        oneTimePrekeys: bundleWithBase64.oneTimePrekeys.map(
+          (keyBase64: string) => decodeBase64ToUint8Array(keyBase64)
+        ),
+      };
+
+      return bundle;
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return []; // Return an empty array if there's an error
+    }
+  };
+
+  const fetchListenerUId = async () => {
+    try {
+      const conversationDocRef = doc(db, "conversations", conversationId);
+
+      const conversationDocSnapshot = await getDoc(conversationDocRef);
+
+      if (!conversationDocSnapshot.exists()) {
+        console.log("Conversation document does not exist");
+        return null;
+      }
+
+      const users = conversationDocSnapshot.data().users;
+
+      const currentUserId = currentUser?.uid || "";
+
+      const listenerUId = users.find(
+        (userId: string) => userId !== currentUserId
+      );
+
+      return listenerUId;
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return []; // Return an empty array if there's an error
+    }
+  };
+
+  const verifyBundle = async (bundle: any) => {
+    await sodium.ready;
+    return sodium.crypto_sign_verify_detached(
+      bundle.signedPrekeySignature,
+      bundle.signedPrekey,
+      bundle.identityKey
+    );
+  };
+
+  function kdf(input: any, keyLength: any) {
+    return CryptoJS.PBKDF2(CryptoJS.lib.WordArray.create(input), "TarChat", {
+      keySize: keyLength * 4,
+      iterations: 10,
+    });
+  }
+
+  const generateSK = async (
+    senderBundle: any,
+    listenerBundle: any,
+    ephemeralKey: any
+  ) => {
+    const DH1 = sodium.crypto_scalarmult(
+      senderBundle.identityKey,
+      listenerBundle.signedPrekey
+    );
+    const DH2 = sodium.crypto_scalarmult(
+      ephemeralKey,
+      listenerBundle.identityKey
+    );
+    const DH3 = sodium.crypto_scalarmult(
+      ephemeralKey,
+      listenerBundle.signedPrekey
+    );
+
+    var DH4 = "";
+
+    if (listenerBundle.oneTimePrekeys.size != 0) {
+      DH4 = sodium.crypto_scalarmult(
+        ephemeralKey,
+        listenerBundle.oneTimePrekeys[0]
+      );
+    }
+
+    const concatenatedDH = new Uint8Array([...DH1, ...DH2, ...DH3, ...DH4]);
+
+    const SK = kdf(concatenatedDH, 32);
+
+    return SK.toString(CryptoJS.enc.Base64);
+  };
+
+  const initiateX3DH = async () => {
+    const listenerUId = await fetchListenerUId();
+    console.log(listenerUId);
+    const listenerBundle = await fetchBundle(listenerUId);
+    console.log(listenerBundle);
+    const currentUserId = currentUser?.uid;
+    const currentUserBundle = await fetchBundle(currentUserId);
+    console.log(currentUserBundle);
+
+    const isVerified = verifyBundle(listenerBundle);
+
+    if (!isVerified) {
+      console.log("Verification Failed");
+    } else {
+      console.log("Verification Success!");
+    }
+
+    const ephemeralKeyPair = sodium.crypto_box_keypair();
+    const ephemeralPublicKey = ephemeralKeyPair.publicKey;
+    const ephemeralPrivateKey = ephemeralKeyPair.privateKey;
+
+    const SK = await generateSK(
+      currentUserBundle,
+      listenerBundle,
+      ephemeralPublicKey
+    );
+
+    console.log(SK);
+
+    //TODO store SK locally
+  };
+
   const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -106,6 +292,13 @@ const InputSection: FC<InputSectionProps> = ({
     }
 
     if (!inputValue.trim()) return;
+
+    if (await isFirstMessage(conversationId)) {
+      console.log("First Message!");
+      initiateX3DH();
+    } else {
+      console.log("Other!");
+    }
 
     setInputValue("");
 
@@ -322,7 +515,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       {previewFiles.length > 0 && (
-        <div className="border-dark-lighten flex h-32 items-center gap-2 border-t px-4">
+        <div className="flex h-32 items-center gap-2 border-t border-dark-lighten px-4">
           {previewFiles.map((preview) => (
             <div key={preview} className="relative">
               <img className="h-28 w-28 object-cover" src={preview} alt="" />
@@ -334,14 +527,14 @@ const InputSection: FC<InputSectionProps> = ({
                 }
                 className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-100"
               >
-                <i className="bx bx-x text-dark text-lg"></i>
+                <i className="bx bx-x text-lg text-dark"></i>
               </button>
             </div>
           ))}
         </div>
       )}
       {previewFiles.length === 0 && !!replyInfo && (
-        <div className="border-dark-lighten flex h-[76px] justify-between border-t p-4">
+        <div className="flex h-[76px] justify-between border-t border-dark-lighten p-4">
           <div>
             <div className="flex items-center gap-2">
               <ReplyIcon />
@@ -371,7 +564,7 @@ const InputSection: FC<InputSectionProps> = ({
         </div>
       )}
       <div
-        className={`border-dark-lighten flex h-16 items-stretch gap-1 border-t px-4 ${
+        className={`flex h-16 items-stretch gap-1 border-t border-dark-lighten px-4 ${
           disabled ? "pointer-events-none select-none" : ""
         }`}
       >
@@ -420,7 +613,7 @@ const InputSection: FC<InputSectionProps> = ({
               }}
               onKeyDown={handleReplaceEmoji}
               onPaste={handlePaste}
-              className="bg-dark-lighten h-9 w-full rounded-full pl-3 pr-10 outline-none"
+              className="h-9 w-full rounded-full bg-dark-lighten pl-3 pr-10 outline-none"
               type="text"
               placeholder="Message..."
             />
@@ -456,7 +649,7 @@ const InputSection: FC<InputSectionProps> = ({
               <Spin width="24px" height="24px" color="#0D90F3" />
             </div>
           ) : (
-            <button className="text-primary flex flex-shrink-0 items-center text-2xl">
+            <button className="flex flex-shrink-0 items-center text-2xl text-primary">
               <i className="bx bxs-send"></i>
             </button>
           )}

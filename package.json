@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "dayjs": "^1.10.7",
     "emoji-mart": "^3.0.1",
     "firebase": "^9.6.4",
