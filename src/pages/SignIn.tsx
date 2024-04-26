@@ -15,6 +15,11 @@ import { db } from "../shared/firebase";
 import { encodeUint8ArrayPropsToBase64 } from "../shared/utils";
 import fs from "fs";
 
+
+
+//Now import this 
+import 'firebase/firestore';
+
 import {
   addDoc,
   collection,
@@ -67,24 +72,12 @@ const SignIn: FC = () => {
     return bundle;
   };
   
-  /*const downloadKeysAsJson = (privateKeys: any) => {
-    const json = JSON.stringify(privateKeys);
-    const blob = new Blob([json], { type: 'application/json' });
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = "privateKeys.json";  // Name of the file to be downloaded
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(href);
-  };*/
-
-  const saveKeysToFile = (privateKeys: any) => {
-    const json = JSON.stringify(privateKeys);
-    const filePath = './src/pages/localKeys.json'; // Adjust the path as necessary
-  
-    fs.writeFileSync(filePath, json, 'utf8');
+  const saveKeysToLocalStorage = (privateKeys: any) => {
+    try {
+      localStorage.setItem('privateKeys', JSON.stringify(privateKeys));
+    } catch (error) {
+      console.error('Error saving keys to local storage:', error);
+    }
   };
 
   const storeBundle = async (bundle: any, user: any) => {
@@ -95,23 +88,87 @@ const SignIn: FC = () => {
     });
   };
 
-  const handleSignIn = async (provider: AuthProvider) => {
-    setLoading(true);
+  const fetchListenerUId = async (userUid: string) => {
+    try {
+      const userDocRef = doc(db, "users", userUid);
+      const userDocRefSnapshot = await getDoc(userDocRef);
 
+      if (!userDocRefSnapshot.exists()) {
+        console.log("User does not exist");
+        return null;
+      }
+
+      const userData = userDocRefSnapshot.data();
+      if (userData && userData.users) {
+        const users = userData.users;
+
+        const currentUserId = currentUser?.uid || "";
+
+        const listenerUId = users.find((userId: string) => userId !== currentUserId);
+
+        return listenerUId;
+      } else {
+        console.log("User data or users field not found");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching listener UId:", error);
+      return null;
+    }
+  };
+
+  const userExistsInDatabase = async (userId: any) => {
+    try {
+      const userDocRef = doc(db, "users", userId);
+      const userDocSnapshot = await getDoc(userDocRef);
+
+      if (userDocSnapshot.exists()) {
+        const userData = userDocSnapshot.data();
+        if (userData && userData.users) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking user existence:", error);
+      return false;
+    }
+  };
+  const getKeysFromLocalStorage = () => {
+    try {
+      const keysJSON = localStorage.getItem('privateKeys');
+      return keysJSON ? JSON.parse(keysJSON) : null;
+    } catch (error) {
+      console.error('Error retrieving keys from local storage:', error);
+      return null;
+    }
+  };
+
+  const handleSignIn = async (provider: any) => {
+    setLoading(true);
+  
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
-          const userSnapshot = await getDoc(doc(db, "users", res.user.uid));
           const bundle = await generateBundle();
-          if (userSnapshot.exists()) {
-            console.log("NOT First time user");
+          console.log("signed in");
+  
+          // Check if it's the user's first sign-in
+          const userExists = await userExistsInDatabase(res.user.uid);
+          if (!userExists) {
+            console.log("First time user");
             const privateKeys = {
-              identityPrivateKey: bundle.identityKey, // Assuming you modify generateBundle to include this
-              signedPrekeyPrivateKey: bundle.signedPrekey, // Assuming included
-              oneTimePrekeyPrivateKey: bundle.oneTimePrekeys[0], // Assuming included
+              identityPrivateKey: bundle.identityKey,
+              signedPrekeyPrivateKey: bundle.signedPrekey,
+              oneTimePrekeyPrivateKey: bundle.oneTimePrekeys[0],
             };
-            saveKeysToFile(privateKeys);
+            saveKeysToLocalStorage(privateKeys);
+            console.log(getKeysFromLocalStorage());
+          
+          } else {
+            console.log("Returning user");
           }
+  
           console.log(res.user);
           storeBundle(bundle, res.user);
         })
@@ -124,12 +181,9 @@ const SignIn: FC = () => {
         });
     } catch (err) {
       setIsAlertOpened(true);
-      setError(`Error generating bundle: ${err.message}`);
       setLoading(false);
     }
   };
-  
-
   if (currentUser) return <Navigate to={redirect || "/"} />;
 
   return (
