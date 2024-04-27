@@ -36,6 +36,7 @@ import {
   formatFileName,
   encodeUint8ArrayPropsToBase64,
   decodeBase64PropsToUint8Array,
+  generateSK,
 } from "../../shared/utils";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
@@ -199,40 +200,6 @@ const InputSection: FC<InputSectionProps> = ({
     }).toString(CryptoJS.enc.Base64);
   }
 
-  const generateSK = async (
-    senderBundle: any,
-    listenerBundle: any,
-    ephemeralKey: any
-  ) => {
-    const DH1 = sodium.crypto_scalarmult(
-      senderBundle.identityKey,
-      listenerBundle.signedPrekey
-    );
-    const DH2 = sodium.crypto_scalarmult(
-      ephemeralKey,
-      listenerBundle.identityKey
-    );
-    const DH3 = sodium.crypto_scalarmult(
-      ephemeralKey,
-      listenerBundle.signedPrekey
-    );
-
-    var DH4 = "";
-
-    if (listenerBundle.oneTimePrekeys.size != 0) {
-      DH4 = sodium.crypto_scalarmult(
-        ephemeralKey,
-        listenerBundle.oneTimePrekeys[0]
-      );
-    }
-
-    const concatenatedDH = new Uint8Array([...DH1, ...DH2, ...DH3, ...DH4]);
-
-    const SK = kdf(concatenatedDH, 32);
-
-    return SK;
-  };
-
   const initiateX3DH = async (senderBundle: any, listenerBundle: any) => {
     const isVerified = verifyBundle(listenerBundle);
 
@@ -246,11 +213,7 @@ const InputSection: FC<InputSectionProps> = ({
     const ephemeralPublicKey = ephemeralKeyPair.publicKey;
     const ephemeralPrivateKey = ephemeralKeyPair.privateKey;
 
-    const SK = await generateSK(
-      senderBundle,
-      listenerBundle,
-      ephemeralPublicKey
-    );
+    const SK = generateSK(senderBundle, listenerBundle, ephemeralPublicKey);
 
     console.log(SK);
 
@@ -455,6 +418,17 @@ const InputSection: FC<InputSectionProps> = ({
     });
 
     setReplyInfo && setReplyInfo(null);
+
+    addDoc(
+      collection(db, "conversations", conversationId as string, "messages"),
+      {
+        sender: currentUser?.uid,
+        content: replacedInputValue.trim(),
+        type: "text",
+        createdAt: serverTimestamp(),
+        replyTo: replyInfo?.id || null,
+      }
+    );
 
     updateTimestamp();
   };

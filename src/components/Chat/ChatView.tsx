@@ -1,8 +1,11 @@
 import { ConversationInfo, MessageItem } from "../../shared/types";
 import { FC, Fragment, useEffect, useRef, useState } from "react";
 import {
+  DocumentData,
+  QuerySnapshot,
   collection,
   doc,
+  getDoc,
   limitToLast,
   orderBy,
   query,
@@ -18,6 +21,7 @@ import { db } from "../../shared/firebase";
 import { useCollectionQuery } from "../../hooks/useCollectionQuery";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
+import { decodeBase64PropsToUint8Array, generateSK } from "../../shared/utils";
 
 interface ChatViewProps {
   conversation: ConversationInfo;
@@ -126,6 +130,31 @@ const ChatView: FC<ChatViewProps> = ({
       </div>
     );
 
+  const getUsersFromLocalStorage = () => {
+    try {
+      const keysJSON = localStorage.getItem("users");
+      return keysJSON ? JSON.parse(keysJSON) : null;
+    } catch (error) {
+      console.error("Error retrieving users from local storage:", error);
+      return null;
+    }
+  };
+
+  const getBundle = (uid: any) => {
+    const users = getUsersFromLocalStorage();
+
+    console.log("users:" + users);
+  };
+
+  const decrypytContent = (content: any) => {
+    const senderBundle = getBundle(currentUser?.uid);
+    const index = conversation.users.indexOf(currentUser?.uid);
+    const listenerUid = conversation.users[(index + 1) % 2];
+    const listenerBundle = getBundle(listenerUid);
+
+    console.log("!!!" + listenerBundle);
+  };
+
   return (
     <InfiniteScroll
       dataLength={data?.size as number}
@@ -143,29 +172,33 @@ const ChatView: FC<ChatViewProps> = ({
       <div className="flex flex-col items-stretch gap-3 pt-10 pb-1">
         {data?.docs
           .map((doc) => ({ id: doc.id, ...doc.data() } as MessageItem))
-          .map((item, index) => (
-            <Fragment key={item.id}>
-              {item.sender === currentUser?.uid ? (
-                <RightMessage
-                  replyInfo={replyInfo}
-                  setReplyInfo={setReplyInfo}
-                  message={item}
-                />
-              ) : (
-                <LeftMessage
-                  replyInfo={replyInfo}
-                  setReplyInfo={setReplyInfo}
-                  message={item}
-                  index={index}
-                  docs={data?.docs}
-                  conversation={conversation}
-                />
-              )}
-              {Object.entries(conversation.seen).filter(
-                ([key, value]) => key !== currentUser?.uid && value === item.id
-              ).length > 0}
-            </Fragment>
-          ))}
+          .map((item, index) => {
+            item.content = decrypytContent(item.content);
+            return (
+              <Fragment key={item.id}>
+                {item.sender === currentUser?.uid ? (
+                  <RightMessage
+                    replyInfo={replyInfo}
+                    setReplyInfo={setReplyInfo}
+                    message={item}
+                  />
+                ) : (
+                  <LeftMessage
+                    replyInfo={replyInfo}
+                    setReplyInfo={setReplyInfo}
+                    message={item}
+                    index={index}
+                    docs={data?.docs}
+                    conversation={conversation}
+                  />
+                )}
+                {Object.entries(conversation.seen).filter(
+                  ([key, value]) =>
+                    key !== currentUser?.uid && value === item.id
+                ).length > 0}
+              </Fragment>
+            );
+          })}
         <div ref={scrollBottomRef}></div>
       </div>
     </InfiniteScroll>
@@ -173,3 +206,6 @@ const ChatView: FC<ChatViewProps> = ({
 };
 
 export default ChatView;
+function firestore() {
+  throw new Error("Function not implemented.");
+}

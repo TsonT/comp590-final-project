@@ -113,3 +113,37 @@ function decodeBase64ToUint8Array(base64String) {
   }
   return uint8Array;
 }
+
+export function generateSK(
+  senderBundle: any,
+  listenerBundle: any,
+  ephemeralKey: any
+) {
+  const DH1 = sodium.crypto_scalarmult(
+    senderBundle.identityKey,
+    listenerBundle.signedPrekey
+  );
+  const DH2 = sodium.crypto_scalarmult(
+    ephemeralKey,
+    listenerBundle.identityKey
+  );
+  const DH3 = sodium.crypto_scalarmult(
+    ephemeralKey,
+    listenerBundle.signedPrekey
+  );
+
+  var DH4 = "";
+
+  if (listenerBundle.oneTimePrekeys.size != 0) {
+    DH4 = sodium.crypto_scalarmult(
+      ephemeralKey,
+      listenerBundle.oneTimePrekeys[0]
+    );
+  }
+
+  const concatenatedDH = new Uint8Array([...DH1, ...DH2, ...DH3, ...DH4]);
+
+  const SK = kdf(concatenatedDH, 32);
+
+  return SK;
+}

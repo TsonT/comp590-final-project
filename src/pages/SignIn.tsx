@@ -12,13 +12,14 @@ import { useQueryParams } from "../hooks/useQueryParams";
 import { useStore } from "../store";
 import sodium from "libsodium-wrappers";
 import { db } from "../shared/firebase";
-import { encodeUint8ArrayPropsToBase64 } from "../shared/utils";
+import {
+  decodeBase64PropsToUint8Array,
+  encodeUint8ArrayPropsToBase64,
+} from "../shared/utils";
 import fs from "fs";
 
-
-
-//Now import this 
-import 'firebase/firestore';
+//Now import this
+import "firebase/firestore";
 
 import {
   addDoc,
@@ -71,12 +72,32 @@ const SignIn: FC = () => {
 
     return bundle;
   };
-  
+
+  const getAllUsers = async () => {
+    try {
+      const UIdsCollectionRef = collection(db, "users");
+
+      // Query to get messages ordered by createdAt timestamp
+      const q = query(UIdsCollectionRef);
+
+      // Get all documents in the messages collection
+      const querySnapshot = await getDocs(q);
+
+      // Extract messages data from the query snapshot
+      const uids = querySnapshot.docs.map((doc) => doc.data());
+
+      return uids;
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return []; // Return an empty array if there's an error
+    }
+  };
+
   const saveKeysToLocalStorage = (privateKeys: any) => {
     try {
-      localStorage.setItem('privateKeys', JSON.stringify(privateKeys));
+      localStorage.setItem("privateKeys", JSON.stringify(privateKeys));
     } catch (error) {
-      console.error('Error saving keys to local storage:', error);
+      console.error("Error saving keys to local storage:", error);
     }
   };
 
@@ -104,7 +125,9 @@ const SignIn: FC = () => {
 
         const currentUserId = currentUser?.uid || "";
 
-        const listenerUId = users.find((userId: string) => userId !== currentUserId);
+        const listenerUId = users.find(
+          (userId: string) => userId !== currentUserId
+        );
 
         return listenerUId;
       } else {
@@ -136,23 +159,52 @@ const SignIn: FC = () => {
   };
   const getKeysFromLocalStorage = () => {
     try {
-      const keysJSON = localStorage.getItem('privateKeys');
+      const keysJSON = localStorage.getItem("privateKeys");
       return keysJSON ? JSON.parse(keysJSON) : null;
     } catch (error) {
-      console.error('Error retrieving keys from local storage:', error);
+      console.error("Error retrieving keys from local storage:", error);
+      return null;
+    }
+  };
+
+  const storeBundlesLocally = (bundles: any) => {
+    try {
+      localStorage.setItem("bundles", JSON.stringify(bundles));
+    } catch (error) {
+      console.error("Error saving bundles to local storage:", error);
+    }
+  };
+
+  const getUsersFromLocalStorage = () => {
+    try {
+      const keysJSON = localStorage.getItem("bundles");
+      return keysJSON ? JSON.parse(keysJSON) : null;
+    } catch (error) {
+      console.error("Error retrieving users from local storage:", error);
       return null;
     }
   };
 
   const handleSignIn = async (provider: any) => {
     setLoading(true);
-  
+
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
           const bundle = await generateBundle();
           console.log("signed in");
-  
+
+          let bundles = [];
+
+          (await getAllUsers()).forEach((user) => {
+            bundles.push(user.bundle);
+          });
+
+          storeBundlesLocally(bundles);
+
+          console.log("IMPORTANT:");
+          console.log(getUsersFromLocalStorage());
+
           // Check if it's the user's first sign-in
           const userExists = await userExistsInDatabase(res.user.uid);
           if (!userExists) {
@@ -164,11 +216,10 @@ const SignIn: FC = () => {
             };
             saveKeysToLocalStorage(privateKeys);
             console.log(getKeysFromLocalStorage());
-          
           } else {
             console.log("Returning user");
           }
-  
+
           console.log(res.user);
           storeBundle(bundle, res.user);
         })
