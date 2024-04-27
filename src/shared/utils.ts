@@ -60,3 +60,56 @@ export const splitLinkFromMessage = (message: string) => {
 
   return result;
 };
+
+export function encodeUint8ArrayPropsToBase64(obj: any) {
+  const encodedObj = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      if (value instanceof Uint8Array) {
+        encodedObj[key] = encodeUint8ArrayToBase64(value);
+      } else if (
+        Array.isArray(value) &&
+        value.every((item) => item instanceof Uint8Array)
+      ) {
+        encodedObj[key] = value.map(encodeUint8ArrayToBase64);
+      } else {
+        encodedObj[key] = value;
+      }
+    }
+  }
+  return encodedObj;
+}
+
+function encodeUint8ArrayToBase64(uint8Array) {
+  return window.btoa(String.fromCharCode.apply(null, uint8Array));
+}
+
+export function decodeBase64PropsToUint8Array(obj: any) {
+  const decodedObj = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      if (typeof value === "string") {
+        decodedObj[key] = decodeBase64ToUint8Array(value);
+      } else if (
+        Array.isArray(value) &&
+        value.every((item) => typeof item === "string")
+      ) {
+        decodedObj[key] = value.map(decodeBase64ToUint8Array);
+      } else {
+        decodedObj[key] = value;
+      }
+    }
+  }
+  return decodedObj;
+}
+
+function decodeBase64ToUint8Array(base64String) {
+  const binaryString = window.atob(base64String);
+  const uint8Array = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    uint8Array[i] = binaryString.charCodeAt(i);
+  }
+  return uint8Array;
+}

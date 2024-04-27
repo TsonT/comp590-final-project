@@ -163,18 +163,7 @@ const ChatView: FC<ChatViewProps> = ({
               )}
               {Object.entries(conversation.seen).filter(
                 ([key, value]) => key !== currentUser?.uid && value === item.id
-              ).length > 0 && (
-                <div className="flex justify-end gap-[1px] px-8">
-                  {Object.entries(conversation.seen)
-                    .filter(
-                      ([key, value]) =>
-                        key !== currentUser?.uid && value === item.id
-                    )
-                    .map(([key, value]) => (
-                      <AvatarFromId key={key} uid={key} size={14} />
-                    ))}
-                </div>
-              )}
+              ).length > 0}
             </Fragment>
           ))}
         <div ref={scrollBottomRef}></div>

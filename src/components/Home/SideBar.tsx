@@ -63,7 +63,9 @@ const SideBar: FC = () => {
                   <button
                     onClick={() => setIsDropdownOpened((prev) => !prev)}
                     className="h-8 w-8 cursor-pointer rounded-full object-cover"
-                  ></button>
+                  >
+                    <i className="bx bxs-user text-xl"></i>
+                  </button>
 
                   <div
                     className={`absolute top-full right-0 flex w-max origin-top-right flex-col items-stretch overflow-hidden rounded-md border border-dark-lighten bg-dark py-1 shadow-lg transition-all duration-200 ${
@@ -79,7 +81,6 @@ const SideBar: FC = () => {
                       }}
                       className="flex items-center gap-1 px-3 py-1 transition duration-300 hover:bg-dark-lighten"
                     >
-                      <i className="bx bxs-user text-xl"></i>
                       <span className="whitespace-nowrap">Profile</span>
                     </button>
                     <button

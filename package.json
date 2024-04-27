@@ -8,9 +8,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@firebase/firestore": "^4.6.1",
+    "crypto-js": "^4.2.0",
     "dayjs": "^1.10.7",
     "emoji-mart": "^3.0.1",
     "firebase": "^9.6.4",
+    "libsodium-wrappers": "^0.7.13",
     "lodash.kebabcase": "^4.1.1",
     "react": "^17.0.2",
     "react-cssfx-loading": "^1.0.3",
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@types/emoji-mart": "^3.0.9",
+    "@types/libsodium-wrappers": "^0.7.14",
     "@types/react": "^17.0.33",
     "@types/react-dom": "^17.0.10",
     "@vitejs/plugin-react": "^1.0.7",
