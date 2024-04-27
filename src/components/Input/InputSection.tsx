@@ -79,6 +79,13 @@ const InputSection: FC<InputSectionProps> = ({
 
   const [fileDragging, setFileDragging] = useState(false);
 
+  let ratchetStates = {
+    sentCount: 0,
+    DHValues: null,
+    DHRoot: null,
+    SenderRoot: null,
+  };
+
   const updateTimestamp = () => {
     updateDoc(doc(db, "conversations", conversationId as string), {
       updatedAt: serverTimestamp(),
@@ -97,7 +104,7 @@ const InputSection: FC<InputSectionProps> = ({
     textInputRef.current?.focus();
   }, [conversationId]);
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = async (conversationId: any) => {
     try {
       const messagesCollectionRef = collection(
         db,
@@ -265,6 +272,18 @@ const InputSection: FC<InputSectionProps> = ({
     };
   }
 
+  const tickDHRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.DHRoot = keys.key1;
+    return keys.key2;
+  };
+
+  const tickSenderRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.SenderRoot = keys.key1;
+    return keys.key2;
+  };
+
   const createMessageBundle = async (
     receiverPK: any,
     rootDHKey: any,
@@ -272,22 +291,28 @@ const InputSection: FC<InputSectionProps> = ({
     listenerBundle: any,
     message: string
   ) => {
-    const senderDHKeys = sodium.crypto_kx_keypair();
+    let senderRatchetRoot = ratchetStates.SenderRoot;
 
-    const DHvalue = sodium.crypto_kx_client_session_keys(
-      senderDHKeys.publicKey,
-      senderDHKeys.privateKey,
-      receiverPK
-    );
+    if (ratchetStates.sentCount === 0) {
+      const senderDHKeys = sodium.crypto_kx_keypair();
 
-    const combinedKey = new Uint8Array([
-      ...encode(DHvalue),
-      ...encode(rootDHKey),
-    ]);
+      ratchetStates.DHValues = senderDHKeys;
 
-    const DHRatchetOutput = RatchetKDF(combinedKey);
+      const DHvalue = sodium.crypto_kx_client_session_keys(
+        senderDHKeys.publicKey,
+        senderDHKeys.privateKey,
+        receiverPK
+      );
 
-    const sendingRatchetOutput = RatchetKDF(DHRatchetOutput.key2);
+      const combinedKey = new Uint8Array([
+        ...encode(DHvalue),
+        ...encode(rootDHKey),
+      ]);
+
+      senderRatchetRoot = tickDHRatchet(combinedKey);
+    }
+
+    const encryptionKey = tickSenderRatchet(senderRatchetRoot);
 
     const AD = new Uint8Array([
       ...encode(senderBundle.identityKey),
@@ -303,13 +328,13 @@ const InputSection: FC<InputSectionProps> = ({
       AD,
       null,
       nonce,
-      sendingRatchetOutput.key2
+      encryptionKey
     );
 
     const messageBundle = {
       encryptedMessage: encryptedMessage,
       nonce: nonce,
-      DHPublicKey: senderDHKeys.publicKey,
+      DHPublicKey: ratchetStates.DHValues.publicKey,
       AD: AD,
     };
 
@@ -333,6 +358,24 @@ const InputSection: FC<InputSectionProps> = ({
     );
   };
 
+  const getListenersDHPublicKey = async () => {
+    try {
+      const messages = await fetchMessages(conversationId);
+
+      // Sort messages based on createdAt field in descending order
+      messages.sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+      // Get the most recent message
+      const mostRecentMessage = messages[0];
+
+      if (mostRecentMessage) {
+        return mostRecentMessage.DHPublicKey;
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  };
+
   const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -353,32 +396,51 @@ const InputSection: FC<InputSectionProps> = ({
 
     if (!inputValue.trim()) return;
 
+    const listenerUId = await fetchListenerUId();
+    console.log(listenerUId);
+
+    const listenerBundle = await fetchBundle(listenerUId);
+    console.log(listenerBundle);
+
+    const currentUserId = currentUser?.uid;
+    const senderBundle = await fetchBundle(currentUserId);
+    console.log(senderBundle);
+
+    let messageBundle;
+
     if (await isFirstMessage(conversationId)) {
-      const listenerUId = await fetchListenerUId();
-      console.log(listenerUId);
-
-      const listenerBundle = await fetchBundle(listenerUId);
-      console.log(listenerBundle);
-
-      const currentUserId = currentUser?.uid;
-      const senderBundle = await fetchBundle(currentUserId);
-      console.log(senderBundle);
+      console.log("first message ever");
 
       const SK = initiateX3DH(senderBundle, listenerBundle);
 
-      const messageBundle = await createMessageBundle(
+      messageBundle = await createMessageBundle(
         listenerBundle.signedPrekey,
         SK,
         senderBundle,
         listenerBundle,
         inputValue
       );
-      console.log(messageBundle);
-
-      await storeMessageBundle(messageBundle, conversationId);
     } else {
-      console.log("Other!");
+      console.log("not the first message");
+
+      if (ratchetStates.sentCount === 0) {
+        ratchetStates.DHValues = sodium.crypto_kx_keypair();
+      }
+
+      messageBundle = await createMessageBundle(
+        await getListenersDHPublicKey(),
+        ratchetStates.DHRoot,
+        senderBundle,
+        listenerBundle,
+        inputValue
+      );
     }
+
+    console.log(messageBundle);
+
+    await storeMessageBundle(messageBundle, conversationId);
+
+    ratchetStates.sentCount += 1;
 
     setInputValue("");
 
@@ -393,17 +455,6 @@ const InputSection: FC<InputSectionProps> = ({
     });
 
     setReplyInfo && setReplyInfo(null);
-
-    addDoc(
-      collection(db, "conversations", conversationId as string, "messages"),
-      {
-        sender: currentUser?.uid,
-        content: replacedInputValue.trim(),
-        type: "text",
-        createdAt: serverTimestamp(),
-        replyTo: replyInfo?.id || null,
-      }
-    );
 
     updateTimestamp();
   };
