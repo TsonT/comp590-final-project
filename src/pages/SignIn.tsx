@@ -44,7 +44,7 @@ const SignIn: FC = () => {
 
   // Function to generate the bundle
   // TODO generate more prekeys
-  const generateBundle = async () => {
+  const generateBundle = async (uid: any) => {
     await sodium.ready;
     const generateKeyPair = () => sodium.crypto_kx_keypair();
 
@@ -61,6 +61,7 @@ const SignIn: FC = () => {
     const oneTimePrekeyPrivateKey = oneTimePrekeyPair.privateKey;
 
     const bundle = {
+      uid: uid,
       identityKey: identityPublicKey,
       signedPrekey: signedPrekeyPublicKey,
       signedPrekeySignature: sodium.crypto_sign_detached(
@@ -191,7 +192,7 @@ const SignIn: FC = () => {
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
-          const bundle = await generateBundle();
+          const bundle = await generateBundle(res.user.uid);
           console.log("signed in");
 
           let bundles = [];

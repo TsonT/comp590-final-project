@@ -130,29 +130,39 @@ const ChatView: FC<ChatViewProps> = ({
       </div>
     );
 
-  const getUsersFromLocalStorage = () => {
+  const getBundlesFromLocalStorage = () => {
     try {
-      const keysJSON = localStorage.getItem("users");
+      const keysJSON = localStorage.getItem("bundles");
       return keysJSON ? JSON.parse(keysJSON) : null;
     } catch (error) {
-      console.error("Error retrieving users from local storage:", error);
+      console.error("Error retrieving bundles from local storage:", error);
       return null;
     }
   };
 
   const getBundle = (uid: any) => {
-    const users = getUsersFromLocalStorage();
+    const bundles = getBundlesFromLocalStorage();
 
-    console.log("users:" + users);
+    console.log("BUNDLES");
+    console.log(bundles);
+
+    console.log("UID: " + uid);
+
+    for (const bundle of bundles) {
+      if (bundle != null && bundle.uid === uid) {
+        return bundle;
+      }
+    }
   };
 
   const decrypytContent = (content: any) => {
-    const senderBundle = getBundle(currentUser?.uid);
+    //const senderBundle = getBundle(currentUser?.uid);
     const index = conversation.users.indexOf(currentUser?.uid);
     const listenerUid = conversation.users[(index + 1) % 2];
     const listenerBundle = getBundle(listenerUid);
 
-    console.log("!!!" + listenerBundle);
+    console.log("LISTENER BUNDLE");
+    console.log(listenerBundle);
   };
 
   return (
