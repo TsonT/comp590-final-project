@@ -1,7 +1,7 @@
 import { FC, useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import { auth, db } from "./shared/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
 
 import BarWave from "react-cssfx-loading/src/BarWave";
 import Chat from "./pages/Chat";
@@ -19,7 +19,7 @@ const App: FC = () => {
     onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
-        setDoc(doc(db, "users", user.uid), {
+        updateDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,

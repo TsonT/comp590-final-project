@@ -15,10 +15,8 @@ import { db } from "../shared/firebase";
 import { encodeUint8ArrayPropsToBase64 } from "../shared/utils";
 import fs from "fs";
 
-
-
-//Now import this 
-import 'firebase/firestore';
+//Now import this
+import "firebase/firestore";
 
 import {
   addDoc,
@@ -71,12 +69,12 @@ const SignIn: FC = () => {
 
     return bundle;
   };
-  
+
   const saveKeysToLocalStorage = (privateKeys: any) => {
     try {
-      localStorage.setItem('privateKeys', JSON.stringify(privateKeys));
+      localStorage.setItem("privateKeys", JSON.stringify(privateKeys));
     } catch (error) {
-      console.error('Error saving keys to local storage:', error);
+      console.error("Error saving keys to local storage:", error);
     }
   };
 
@@ -104,7 +102,9 @@ const SignIn: FC = () => {
 
         const currentUserId = currentUser?.uid || "";
 
-        const listenerUId = users.find((userId: string) => userId !== currentUserId);
+        const listenerUId = users.find(
+          (userId: string) => userId !== currentUserId
+        );
 
         return listenerUId;
       } else {
@@ -124,7 +124,8 @@ const SignIn: FC = () => {
 
       if (userDocSnapshot.exists()) {
         const userData = userDocSnapshot.data();
-        if (userData && userData.users) {
+
+        if (userData) {
           return true;
         }
       }
@@ -136,26 +137,33 @@ const SignIn: FC = () => {
   };
   const getKeysFromLocalStorage = () => {
     try {
-      const keysJSON = localStorage.getItem('privateKeys');
+      const keysJSON = localStorage.getItem("privateKeys");
       return keysJSON ? JSON.parse(keysJSON) : null;
     } catch (error) {
-      console.error('Error retrieving keys from local storage:', error);
+      console.error("Error retrieving keys from local storage:", error);
       return null;
+    }
+  };
+
+  const storeBundlesLocally = (bundles: any) => {
+    try {
+      localStorage.setItem("bundles", JSON.stringify(bundles));
+    } catch (error) {
+      console.error("Error saving bundles to local storage:", error);
     }
   };
 
   const handleSignIn = async (provider: any) => {
     setLoading(true);
-  
+
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
-          const bundle = await generateBundle();
-          console.log("signed in");
-  
           // Check if it's the user's first sign-in
           const userExists = await userExistsInDatabase(res.user.uid);
           if (!userExists) {
+            const bundle = await generateBundle();
+
             console.log("First time user");
             const privateKeys = {
               identityPrivateKey: bundle.identityKey,
@@ -163,14 +171,13 @@ const SignIn: FC = () => {
               oneTimePrekeyPrivateKey: bundle.oneTimePrekeys[0],
             };
             saveKeysToLocalStorage(privateKeys);
+
+            storeBundle(bundle, res.user);
             console.log(getKeysFromLocalStorage());
-          
           } else {
             console.log("Returning user");
           }
-  
           console.log(res.user);
-          storeBundle(bundle, res.user);
         })
         .catch((err) => {
           setIsAlertOpened(true);
