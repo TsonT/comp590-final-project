@@ -148,7 +148,7 @@ const SignIn: FC = () => {
 
       if (userDocSnapshot.exists()) {
         const userData = userDocSnapshot.data();
-        if (userData && userData.users) {
+        if (userData) {
           return true;
         }
       }
@@ -192,7 +192,6 @@ const SignIn: FC = () => {
     try {
       signInWithPopup(auth, provider)
         .then(async (res) => {
-          const bundle = await generateBundle(res.user.uid);
           console.log("signed in");
 
           let bundles = [];
@@ -209,6 +208,8 @@ const SignIn: FC = () => {
           // Check if it's the user's first sign-in
           const userExists = await userExistsInDatabase(res.user.uid);
           if (!userExists) {
+            const bundle = await generateBundle(res.user.uid);
+
             console.log("First time user");
             const privateKeys = {
               identityPrivateKey: bundle.identityKey,
@@ -217,12 +218,12 @@ const SignIn: FC = () => {
             };
             saveKeysToLocalStorage(privateKeys);
             console.log(getKeysFromLocalStorage());
+            storeBundle(bundle, res.user);
           } else {
             console.log("Returning user");
           }
 
           console.log(res.user);
-          storeBundle(bundle, res.user);
         })
         .catch((err) => {
           setIsAlertOpened(true);

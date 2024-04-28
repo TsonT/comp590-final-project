@@ -6,6 +6,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   limitToLast,
   orderBy,
   query,
@@ -21,7 +22,14 @@ import { db } from "../../shared/firebase";
 import { useCollectionQuery } from "../../hooks/useCollectionQuery";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
-import { decodeBase64PropsToUint8Array, generateSK } from "../../shared/utils";
+import {
+  decodeBase64PropsToUint8Array,
+  generateSK,
+  getItemFromLocalStorage,
+  storeItemLocally,
+} from "../../shared/utils";
+import sodium from "libsodium-wrappers";
+import * as CryptoJS from "crypto-js";
 
 interface ChatViewProps {
   conversation: ConversationInfo;
@@ -29,6 +37,15 @@ interface ChatViewProps {
   replyInfo: any;
   setReplyInfo: (value: any) => void;
 }
+
+let ratchetStates = {
+  receivedCount: 0,
+  DHValues: null,
+  DHRoot: null,
+  ReceiverRoot: null,
+  decryptedMessageIds: new Set(),
+  decryptedMessagePlaintexts: [],
+};
 
 const ChatView: FC<ChatViewProps> = ({
   conversation,
@@ -45,11 +62,10 @@ const ChatView: FC<ChatViewProps> = ({
   const [limitCount, setLimitCount] = useState(10);
 
   const { data, loading, error } = useCollectionQuery(
-    `conversation-data-${conversationId}-${limitCount}`,
+    `conversation-data-${conversationId}`,
     query(
       collection(db, "conversations", conversationId as string, "messages"),
-      orderBy("createdAt"),
-      limitToLast(limitCount)
+      orderBy("createdAt")
     )
   );
 
@@ -130,6 +146,11 @@ const ChatView: FC<ChatViewProps> = ({
       </div>
     );
 
+  function encode(str: any) {
+    const encoder = new TextEncoder();
+    return encoder.encode(str);
+  }
+
   const getBundlesFromLocalStorage = () => {
     try {
       const keysJSON = localStorage.getItem("bundles");
@@ -143,11 +164,6 @@ const ChatView: FC<ChatViewProps> = ({
   const getBundle = (uid: any) => {
     const bundles = getBundlesFromLocalStorage();
 
-    console.log("BUNDLES");
-    console.log(bundles);
-
-    console.log("UID: " + uid);
-
     for (const bundle of bundles) {
       if (bundle != null && bundle.uid === uid) {
         return bundle;
@@ -155,15 +171,128 @@ const ChatView: FC<ChatViewProps> = ({
     }
   };
 
-  const decrypytContent = (content: any) => {
-    //const senderBundle = getBundle(currentUser?.uid);
-    const index = conversation.users.indexOf(currentUser?.uid);
-    const listenerUid = conversation.users[(index + 1) % 2];
-    const listenerBundle = getBundle(listenerUid);
+  function kdf(input: any, keyLength: any) {
+    return CryptoJS.PBKDF2(CryptoJS.lib.WordArray.create(input), "TarChat", {
+      keySize: keyLength * 4,
+      iterations: 10,
+    }).toString(CryptoJS.enc.Base64);
+  }
 
-    console.log("LISTENER BUNDLE");
-    console.log(listenerBundle);
+  function RatchetKDF(input: any) {
+    const key = kdf(input, 64);
+
+    return {
+      key1: key.slice(0, 32),
+      key2: key.slice(32, 64),
+    };
+  }
+
+  const tickDHRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.DHRoot = keys.key1;
+    return keys.key2;
   };
+
+  const tickReceiverRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.ReceiverRoot = keys.key1;
+    return keys.key2;
+  };
+
+  const getSentMessagesFromLocalStorage = () => {
+    try {
+      const keysJSON = localStorage.getItem("sentMessages");
+      return keysJSON ? JSON.parse(keysJSON) : null;
+    } catch (error) {
+      console.error("Error retrieving sentMessages from local storage:", error);
+      return null;
+    }
+  };
+
+  const decrypytMessage = (messageBundle: any) => {
+    let receiverRatchetRoot = ratchetStates.ReceiverRoot;
+
+    if (ratchetStates.receivedCount === 0) {
+      ratchetStates.DHValues = sodium.crypto_kx_keypair();
+
+      const DHvalue = sodium.crypto_kx_client_session_keys(
+        ratchetStates.DHValues.publicKey,
+        ratchetStates.DHValues.privateKey,
+        messageBundle.DHPublicKey
+      );
+
+      const combinedKey = new Uint8Array([
+        ...encode(DHvalue),
+        ...encode(ratchetStates.DHRoot),
+      ]);
+
+      console.log(combinedKey);
+
+      receiverRatchetRoot = tickDHRatchet(combinedKey);
+    }
+
+    const decryptionKey = tickReceiverRatchet(receiverRatchetRoot);
+    console.log("DECRYPTION KEY:", decryptionKey);
+
+    const decryptedMessage = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+      null,
+      messageBundle.encryptedMessage,
+      messageBundle.AD,
+      messageBundle.nonce,
+      decryptionKey
+    );
+
+    return new TextDecoder().decode(decryptedMessage);
+  };
+
+  const decryptFirstMessage = (
+    senderBundle: any,
+    listenerBundle: any,
+    messageBundle: any
+  ) => {
+    const SK = generateSK(
+      senderBundle,
+      listenerBundle,
+      messageBundle.ephemeralKey
+    );
+
+    console.log(SK);
+
+    ratchetStates.DHRoot = SK;
+
+    return decrypytMessage(messageBundle);
+  };
+
+  const decrypytContent = (content: any) => {
+    const listenerBundle = decodeBase64PropsToUint8Array(
+      getBundle(currentUser?.uid)
+    );
+    const senderUidIndex = conversation.users.indexOf(currentUser?.uid);
+    const senderUid = conversation.users[(senderUidIndex + 1) % 2];
+    const senderBundle = decodeBase64PropsToUint8Array(getBundle(senderUid));
+
+    const messageBundle = decodeBase64PropsToUint8Array(content);
+
+    let decryptedMessage = "";
+
+    if (data?.docs.length === 1) {
+      decryptedMessage = decryptFirstMessage(
+        senderBundle,
+        listenerBundle,
+        messageBundle
+      );
+    } else {
+      decryptedMessage = decrypytMessage(messageBundle);
+    }
+
+    ratchetStates.receivedCount += 1;
+
+    console.log(decryptedMessage);
+    return decryptedMessage;
+  };
+
+  let sentMessages: any[] = [];
+  let receivedMessages: any[] = [];
 
   return (
     <InfiniteScroll
@@ -181,9 +310,39 @@ const ChatView: FC<ChatViewProps> = ({
     >
       <div className="flex flex-col items-stretch gap-3 pt-10 pb-1">
         {data?.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() } as MessageItem))
+          .map((doc) => {
+            const messageItem = { id: doc.id, ...doc.data() } as MessageItem;
+
+            sentMessages = getSentMessagesFromLocalStorage()?.reverse();
+            receivedMessages =
+              getItemFromLocalStorage(
+                "ratchetStates"
+              )?.decryptedMessagePlaintexts.reverse();
+
+            return messageItem;
+          })
           .map((item, index) => {
-            item.content = decrypytContent(item.content);
+            console.log(ratchetStates.decryptedMessagePlaintexts);
+            console.log(receivedMessages);
+            console.log(item);
+            if (item.sender == currentUser?.uid) {
+              item.content = sentMessages.pop();
+            } else if (!ratchetStates.decryptedMessageIds.has(item.id)) {
+              console.log(1);
+              storeItemLocally("listenerDHPK", item.content.DHPublicKey);
+              const decrypytedMessage = decrypytContent(item.content);
+              item.content = decrypytedMessage;
+              ratchetStates.decryptedMessageIds.add(item.id);
+              ratchetStates.decryptedMessagePlaintexts.push(decrypytedMessage);
+            } else {
+              console.log(2);
+              item.content = receivedMessages.pop();
+            }
+
+            storeItemLocally("ratchetStates", ratchetStates);
+
+            console.log(item.content);
+
             return (
               <Fragment key={item.id}>
                 {item.sender === currentUser?.uid ? (
