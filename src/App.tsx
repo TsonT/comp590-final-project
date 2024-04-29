@@ -1,7 +1,7 @@
 import { FC, useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import { auth, db } from "./shared/firebase";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 import BarWave from "react-cssfx-loading/src/BarWave";
 import Chat from "./pages/Chat";
@@ -15,17 +15,42 @@ const App: FC = () => {
   const currentUser = useStore((state) => state.currentUser);
   const setCurrentUser = useStore((state) => state.setCurrentUser);
 
+  const userExists = async (UId: any) => {
+    try {
+      const UIdDocRef = doc(db, "users", UId);
+
+      const UIdDocSnapshot = await getDoc(UIdDocRef);
+
+      return UIdDocSnapshot.exists();
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return []; // Return an empty array if there's an error
+    }
+  };
+
   useEffect(() => {
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
-        updateDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          phoneNumber: user.phoneNumber || user.providerData?.[0]?.phoneNumber,
-        });
+        if (await userExists(user.uid)) {
+          updateDoc(doc(db, "users", user.uid), {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            phoneNumber:
+              user.phoneNumber || user.providerData?.[0]?.phoneNumber,
+          });
+        } else {
+          setDoc(doc(db, "users", user.uid), {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            phoneNumber:
+              user.phoneNumber || user.providerData?.[0]?.phoneNumber,
+          });
+        }
       } else setCurrentUser(null);
     });
   }, []);

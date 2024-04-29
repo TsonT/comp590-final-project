@@ -141,14 +141,15 @@ const SignIn: FC = () => {
     }
   };
 
-  const userExistsInDatabase = async (userId: any) => {
+  const userHasBundle = async (userId: any) => {
+    console.log("checking if user has bundle");
     try {
       const userDocRef = doc(db, "users", userId);
       const userDocSnapshot = await getDoc(userDocRef);
 
       if (userDocSnapshot.exists()) {
         const userData = userDocSnapshot.data();
-        if (userData) {
+        if (userData.bundles) {
           return true;
         }
       }
@@ -194,20 +195,8 @@ const SignIn: FC = () => {
         .then(async (res) => {
           console.log("signed in");
 
-          let bundles = [];
-
-          (await getAllUsers()).forEach((user) => {
-            bundles.push(user.bundle);
-          });
-
-          storeBundlesLocally(bundles);
-
-          console.log("IMPORTANT:");
-          console.log(getUsersFromLocalStorage());
-
           // Check if it's the user's first sign-in
-          const userExists = await userExistsInDatabase(res.user.uid);
-          if (!userExists) {
+          if (!(await userHasBundle(res.user.uid))) {
             const bundle = await generateBundle(res.user.uid);
 
             console.log("First time user");
@@ -222,6 +211,17 @@ const SignIn: FC = () => {
           } else {
             console.log("Returning user");
           }
+
+          let bundles = [];
+
+          (await getAllUsers()).forEach((user) => {
+            bundles.push(user.bundle);
+          });
+
+          storeBundlesLocally(bundles);
+
+          console.log("IMPORTANT:");
+          console.log(getUsersFromLocalStorage());
 
           console.log(res.user);
         })
