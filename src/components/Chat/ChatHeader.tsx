@@ -95,9 +95,9 @@ const ChatHeader: FC<ChatHeaderProps> = ({ conversation }) => {
                 className="bg-dark-lighten flex h-8 w-8 items-center justify-center rounded-full text-white"
               >
                 <img
-                  src="../../../public/lock_image.png"
+                  src="../../../public/lock_image.svg"
                   alt="Picture Button"
-                  style={{ width: "40%", height: "50%", objectFit: "cover" }}
+                  style={{ width: "45%", height: "55%", objectFit: "cover" }}
                 />
               </button>
             </div>
