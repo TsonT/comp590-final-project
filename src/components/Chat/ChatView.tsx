@@ -4,6 +4,7 @@ import {
   DocumentData,
   QuerySnapshot,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -120,6 +121,36 @@ const ChatView: FC<ChatViewProps> = ({
     return () => {
       removeEventListener("focus", focusHandler);
       removeEventListener("blur", blurHandler);
+    };
+  }, []);
+
+  const deleteConversation = async () => {
+    try {
+      // Construct a reference to the document
+      const documentRef = doc(db, "conversations", conversationId);
+
+      // Delete the document
+      await deleteDoc(documentRef);
+
+      console.log("Document successfully deleted before unload.");
+    } catch (error) {
+      console.error("Error deleting document before unload:", error);
+      // Handle error appropriately
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = async (event) => {
+      await deleteConversation();
+
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      // Clean up the event listener when the component unmounts
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 

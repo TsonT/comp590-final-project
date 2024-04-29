@@ -132,21 +132,29 @@ const CreateConversation: FC<CreateConversationProps> = ({ setIsOpened }) => {
                     onClick={() => handleToggle(doc.data().uid)}
                     className="flex items-center gap-2 px-5 py-2 transition"
                     style={{
-                      backgroundColor: selected.includes(doc.data().uid) ? '#1E40AF' : 'transparent',
-                      color: selected.includes(doc.data().uid) ? '#FFFFFF' : '#000000',
-                      cursor: 'pointer',
+                      backgroundColor: selected.includes(doc.data().uid)
+                        ? "#1E40AF"
+                        : "transparent",
+                      color: selected.includes(doc.data().uid)
+                        ? "#FFFFFF"
+                        : "#000000",
+                      cursor: "pointer",
                     }}
                   >
                     <button
                       className="flex-shrink-0 cursor-pointer"
                       onClick={() => handleToggle(doc.data().uid)}
                       style={{
-                        backgroundColor: selected.includes(doc.data().uid) ? '#1E40AF' : '#E5E7EB',
-                        color: selected.includes(doc.data().uid) ? '#FFFFFF' : '#000000',
-                        border: 'none',
-                        borderRadius: '0.375rem',
-                        padding: '0.5rem 1rem',
-                        transition: 'background-color 0.3s',
+                        backgroundColor: selected.includes(doc.data().uid)
+                          ? "#1E40AF"
+                          : "#E5E7EB",
+                        color: selected.includes(doc.data().uid)
+                          ? "#FFFFFF"
+                          : "#000000",
+                        border: "none",
+                        borderRadius: "0.375rem",
+                        padding: "0.5rem 1rem",
+                        transition: "background-color 0.3s",
                       }}
                     >
                       {doc.data().displayName}
