@@ -27,7 +27,7 @@ export interface SavedUser {
 export interface MessageItem {
   id?: string;
   sender: string;
-  content: string;
+  content: any;
   replyTo?: string;
   file?: {
     name: string;

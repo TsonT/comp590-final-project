@@ -36,6 +36,9 @@ import {
   formatFileName,
   encodeUint8ArrayPropsToBase64,
   decodeBase64PropsToUint8Array,
+  generateSK,
+  getItemFromLocalStorage,
+  decodeBase64ToUint8Array,
 } from "../../shared/utils";
 import { useParams } from "react-router-dom";
 import { useStore } from "../../store";
@@ -50,6 +53,15 @@ interface InputSectionProps {
   replyInfo?: any;
   setReplyInfo?: (value: any) => void;
 }
+
+let ratchetStates = {
+  sentCount: 0,
+  DHValues: null,
+  DHRoot: null,
+  SenderRoot: null,
+  ephemeralKey: "",
+  sentMessages: [],
+};
 
 const InputSection: FC<InputSectionProps> = ({
   disabled,
@@ -97,7 +109,7 @@ const InputSection: FC<InputSectionProps> = ({
     textInputRef.current?.focus();
   }, [conversationId]);
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = async (conversationId: any) => {
     try {
       const messagesCollectionRef = collection(
         db,
@@ -192,40 +204,6 @@ const InputSection: FC<InputSectionProps> = ({
     }).toString(CryptoJS.enc.Base64);
   }
 
-  const generateSK = async (
-    senderBundle: any,
-    listenerBundle: any,
-    ephemeralKey: any
-  ) => {
-    const DH1 = sodium.crypto_scalarmult(
-      senderBundle.identityKey,
-      listenerBundle.signedPrekey
-    );
-    const DH2 = sodium.crypto_scalarmult(
-      ephemeralKey,
-      listenerBundle.identityKey
-    );
-    const DH3 = sodium.crypto_scalarmult(
-      ephemeralKey,
-      listenerBundle.signedPrekey
-    );
-
-    var DH4 = "";
-
-    if (listenerBundle.oneTimePrekeys.size != 0) {
-      DH4 = sodium.crypto_scalarmult(
-        ephemeralKey,
-        listenerBundle.oneTimePrekeys[0]
-      );
-    }
-
-    const concatenatedDH = new Uint8Array([...DH1, ...DH2, ...DH3, ...DH4]);
-
-    const SK = kdf(concatenatedDH, 32);
-
-    return SK;
-  };
-
   const initiateX3DH = async (senderBundle: any, listenerBundle: any) => {
     const isVerified = verifyBundle(listenerBundle);
 
@@ -239,13 +217,9 @@ const InputSection: FC<InputSectionProps> = ({
     const ephemeralPublicKey = ephemeralKeyPair.publicKey;
     const ephemeralPrivateKey = ephemeralKeyPair.privateKey;
 
-    const SK = await generateSK(
-      senderBundle,
-      listenerBundle,
-      ephemeralPublicKey
-    );
+    ratchetStates.ephemeralKey = ephemeralPublicKey;
 
-    console.log(SK);
+    const SK = generateSK(senderBundle, listenerBundle, ephemeralPublicKey);
 
     //TODO store SK locally
 
@@ -265,6 +239,18 @@ const InputSection: FC<InputSectionProps> = ({
     };
   }
 
+  const tickDHRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.DHRoot = keys.key1;
+    return keys.key2;
+  };
+
+  const tickSenderRatchet = (combinedKey: any) => {
+    const keys = RatchetKDF(combinedKey);
+    ratchetStates.SenderRoot = keys.key1;
+    return keys.key2;
+  };
+
   const createMessageBundle = async (
     receiverPK: any,
     rootDHKey: any,
@@ -272,22 +258,36 @@ const InputSection: FC<InputSectionProps> = ({
     listenerBundle: any,
     message: string
   ) => {
-    const senderDHKeys = sodium.crypto_kx_keypair();
+    let senderRatchetRoot = ratchetStates.SenderRoot;
 
-    const DHvalue = sodium.crypto_kx_client_session_keys(
-      senderDHKeys.publicKey,
-      senderDHKeys.privateKey,
-      receiverPK
-    );
+    console.log(ratchetStates);
 
-    const combinedKey = new Uint8Array([
-      ...encode(DHvalue),
-      ...encode(rootDHKey),
-    ]);
+    if (ratchetStates.sentCount === 0) {
+      const senderDHKeys = sodium.crypto_kx_keypair();
 
-    const DHRatchetOutput = RatchetKDF(combinedKey);
+      ratchetStates.DHValues = senderDHKeys;
 
-    const sendingRatchetOutput = RatchetKDF(DHRatchetOutput.key2);
+      console.log("recPK:" + senderDHKeys.publicKey);
+
+      const DHvalue = sodium.crypto_kx_client_session_keys(
+        senderDHKeys.publicKey,
+        senderDHKeys.privateKey,
+        receiverPK
+      );
+
+      const combinedKey = new Uint8Array([
+        ...encode(DHvalue),
+        ...encode(rootDHKey),
+      ]);
+
+      console.log(combinedKey);
+
+      senderRatchetRoot = tickDHRatchet(combinedKey);
+    }
+
+    const encryptionKey = tickSenderRatchet(senderRatchetRoot);
+
+    console.log("ENCRYPTION KEY:" + encryptionKey);
 
     const AD = new Uint8Array([
       ...encode(senderBundle.identityKey),
@@ -303,14 +303,15 @@ const InputSection: FC<InputSectionProps> = ({
       AD,
       null,
       nonce,
-      sendingRatchetOutput.key2
+      encryptionKey
     );
 
     const messageBundle = {
       encryptedMessage: encryptedMessage,
       nonce: nonce,
-      DHPublicKey: senderDHKeys.publicKey,
+      DHPublicKey: ratchetStates.DHValues.publicKey,
       AD: AD,
+      ephemeralKey: ratchetStates.ephemeralKey,
     };
 
     return messageBundle;
@@ -333,6 +334,32 @@ const InputSection: FC<InputSectionProps> = ({
     );
   };
 
+  const getListenersDHPublicKey = async () => {
+    try {
+      const messages = await fetchMessages(conversationId);
+
+      // Sort messages based on createdAt field in descending order
+      messages.sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+      // Get the most recent message
+      const mostRecentMessage = messages[0];
+
+      if (mostRecentMessage) {
+        return mostRecentMessage.DHPublicKey;
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  };
+
+  const storeSentMessagesLocally = (sentMessages: any) => {
+    try {
+      localStorage.setItem("sentMessages", JSON.stringify(sentMessages));
+    } catch (error) {
+      console.error("Error saving sentMessages to local storage:", error);
+    }
+  };
+
   const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -353,32 +380,61 @@ const InputSection: FC<InputSectionProps> = ({
 
     if (!inputValue.trim()) return;
 
+    const listenerUId = await fetchListenerUId();
+    console.log(listenerUId);
+
+    const listenerBundle = await fetchBundle(listenerUId);
+    console.log(listenerBundle);
+
+    const currentUserId = currentUser?.uid;
+    const senderBundle = await fetchBundle(currentUserId);
+    console.log(senderBundle);
+
+    let messageBundle;
+
     if (await isFirstMessage(conversationId)) {
-      const listenerUId = await fetchListenerUId();
-      console.log(listenerUId);
+      console.log("first message ever");
 
-      const listenerBundle = await fetchBundle(listenerUId);
-      console.log(listenerBundle);
+      const SK = await initiateX3DH(senderBundle, listenerBundle);
 
-      const currentUserId = currentUser?.uid;
-      const senderBundle = await fetchBundle(currentUserId);
-      console.log(senderBundle);
+      console.log(SK);
 
-      const SK = initiateX3DH(senderBundle, listenerBundle);
-
-      const messageBundle = await createMessageBundle(
+      messageBundle = await createMessageBundle(
         listenerBundle.signedPrekey,
         SK,
         senderBundle,
         listenerBundle,
         inputValue
       );
-      console.log(messageBundle);
-
-      await storeMessageBundle(messageBundle, conversationId);
     } else {
-      console.log("Other!");
+      console.log("not the first message");
+
+      console.log(ratchetStates);
+
+      const listenerDHPK = decodeBase64ToUint8Array(
+        getItemFromLocalStorage("listenerDHPK")
+      );
+
+      console.log("listenerDHK:" + listenerDHPK);
+
+      messageBundle = await createMessageBundle(
+        listenerDHPK != undefined ? listenerDHPK : listenerBundle.signedPrekey,
+        ratchetStates.DHRoot,
+        senderBundle,
+        listenerBundle,
+        inputValue
+      );
     }
+
+    ratchetStates.sentMessages.push(inputValue);
+
+    storeSentMessagesLocally(ratchetStates.sentMessages);
+
+    console.log(messageBundle);
+
+    await storeMessageBundle(messageBundle, conversationId);
+
+    ratchetStates.sentCount += 1;
 
     setInputValue("");
 
@@ -394,16 +450,16 @@ const InputSection: FC<InputSectionProps> = ({
 
     setReplyInfo && setReplyInfo(null);
 
-    addDoc(
-      collection(db, "conversations", conversationId as string, "messages"),
-      {
-        sender: currentUser?.uid,
-        content: replacedInputValue.trim(),
-        type: "text",
-        createdAt: serverTimestamp(),
-        replyTo: replyInfo?.id || null,
-      }
-    );
+    // addDoc(
+    //   collection(db, "conversations", conversationId as string, "messages"),
+    //   {
+    //     sender: currentUser?.uid,
+    //     content: replacedInputValue.trim(),
+    //     type: "text",
+    //     createdAt: serverTimestamp(),
+    //     replyTo: replyInfo?.id || null,
+    //   }
+    // );
 
     updateTimestamp();
   };
